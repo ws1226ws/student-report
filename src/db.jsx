@@ -17,6 +17,37 @@
   });
 })();
 
+/* === Helper: ตรวจสอบ + auto-create strength_group ถ้าไม่มี === */
+async function ensureStrengthGroupExists(state, groupName){
+  if(!groupName) return;
+  const sb = window.sb;
+  // 1) ลองหาจาก client state ก่อน (เร็ว)
+  const localHas = state.strengthGroups.find(g => g.name === groupName);
+  if(localHas){
+    // 2) state ว่ามี — verify ที่ DB ด้วย (กันกรณี state drift)
+    const { data: dbRow } = await sb.from('strength_groups').select('name').eq('name', groupName).maybeSingle();
+    if(dbRow) return;
+    console.warn('[strength] group exists in state แต่ไม่มีใน DB → จะ insert ให้:', groupName);
+  } else {
+    console.warn('[strength] group ใหม่ที่ไม่มีใน state → จะ insert:', groupName);
+  }
+  // 3) upsert group ที่ขาดไป
+  const newGroup = { name: groupName, color: '#9D7FFF', emoji: '✨', sort: 99 };
+  const { error } = await sb.from('strength_groups').upsert(newGroup, { onConflict: 'name' });
+  if(error) console.error('[strength] ensureGroup upsert FAILED', error);
+}
+
+function mapStrengthError(err, attemptedGroup){
+  const msg = err?.message || String(err);
+  if(/foreign key.*character_strengths_group_fkey/i.test(msg)){
+    return new Error(
+      `บันทึกไม่สำเร็จ: หมวด "${attemptedGroup}" ไม่มีในตาราง strength_groups\n\n` +
+      `แก้: กดปุ่ม "🔄 รีโหลดข้อมูล" ในแท็บ "ข้อมูล" ของ Admin · หรือ logout → login ใหม่`
+    );
+  }
+  return err;
+}
+
 /* === Helper: เรียก Edge Function admin-teachers === */
 async function callAdminFn(action, payload){
   const sb = window.sb;
@@ -190,8 +221,20 @@ async function dbMutate(state, action){
     case 'cat-update': { const existing = state.behaviorCategories.find(c=>c.id===action.id); const { error } = await sb.from('behavior_categories').update(catToRow({...existing,...action.patch})).eq('id', action.id); if(error) throw error; return action; }
     case 'cat-remove': { const { error } = await sb.from('behavior_categories').delete().eq('id', action.id); if(error) throw error; return action; }
 
-    case 'strength-add':    { const { error } = await sb.from('character_strengths').insert(strengthToRow(action.strength)); if(error) throw error; return action; }
-    case 'strength-update': { const existing = state.characterStrengths.find(s=>s.id===action.id); const { error } = await sb.from('character_strengths').update(strengthToRow({...existing,...action.patch})).eq('id', action.id); if(error) throw error; return action; }
+    case 'strength-add':    {
+      await ensureStrengthGroupExists(state, action.strength.group);
+      const { error } = await sb.from('character_strengths').insert(strengthToRow(action.strength));
+      if(error) throw mapStrengthError(error, action.strength.group);
+      return action;
+    }
+    case 'strength-update': {
+      const existing = state.characterStrengths.find(s=>s.id===action.id);
+      const merged = {...existing, ...action.patch};
+      await ensureStrengthGroupExists(state, merged.group);
+      const { error } = await sb.from('character_strengths').update(strengthToRow(merged)).eq('id', action.id);
+      if(error) throw mapStrengthError(error, merged.group);
+      return action;
+    }
     case 'strength-remove': { const { error } = await sb.from('character_strengths').delete().eq('id', action.id); if(error) throw error; return action; }
 
     case 'group-add':    { const { error } = await sb.from('strength_groups').insert(groupToRow(action.group)); if(error) throw error; return action; }

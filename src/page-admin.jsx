@@ -730,6 +730,17 @@ function AdminData({state, dispatch}){
       <div className="card">
         <div className="card-title"><div className="t"><div className="ic" style={{background:'var(--grad-primary)'}}><Icon name="settings" size={16} color="#fff"/></div> การจัดการข้อมูล</div></div>
         <div className="stack">
+          <button className="btn btn-soft-sky" onClick={async ()=>{
+            try {
+              const data = await window.hydrateFromDb();
+              dispatch({type:'hydrate', data});
+              alert('โหลดข้อมูลจาก Supabase ใหม่เรียบร้อย');
+            } catch(e){
+              alert('โหลดไม่สำเร็จ: ' + (e?.message || e));
+            }
+          }}>
+            <Icon name="chart" size={14}/> 🔄 รีโหลดข้อมูลจาก Supabase
+          </button>
           <button className="btn btn-soft-violet" onClick={()=>{
             if(confirm('รีโหลดข้อมูลตัวอย่างจะเขียนทับข้อมูลปัจจุบัน — ดำเนินการต่อ?'))
               dispatch({type:'reset-seed'});
