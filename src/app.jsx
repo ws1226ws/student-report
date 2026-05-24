@@ -288,17 +288,16 @@ function App(){
           </>}
         </nav>
 
-        <div style={{marginTop:'auto', padding:14, background:'#fff', borderRadius:18, boxShadow:'var(--shadow-sm)'}}>
-          <div className="row" style={{justifyContent:'space-between'}}>
-            <div className="row">
-              <AvatarBubble
-                photoUrl={state.user.photoUrl}
-                color={state.user.avatar || (role==='admin' ? '#7A5CFF' : '#FFB36B')}
-                initial={role==='admin' ? '👑' : '🍎'}
-                size={40}
-                radius={14}
-              />
-              <div style={{minWidth:0, flex:1}}>
+        <div style={{marginTop:'auto', padding:14, background:'#fff', borderRadius:18, boxShadow:'var(--shadow-sm)', overflow:'hidden'}}>
+          <div style={{display:'flex', alignItems:'center', gap:10, minWidth:0}}>
+            <AvatarBubble
+              photoUrl={state.user.photoUrl}
+              color={state.user.avatar || (role==='admin' ? '#7A5CFF' : '#FFB36B')}
+              initial={role==='admin' ? '👑' : '🍎'}
+              size={40}
+              radius={14}
+            />
+            <div style={{minWidth:0, flex:1}}>
                 {(() => {
                   if(role==='admin'){
                     return <div style={{fontWeight:600,fontSize:13}}>admin</div>;
@@ -323,12 +322,11 @@ function App(){
                     </>
                   );
                 })()}
-                <div className="muted" style={{fontSize:11}}>
-                  {role==='admin' ? 'โหมดผู้ดูแลระบบ' : `เทอม ${state.currentTerm}/${state.currentYear}`}
-                </div>
+              <div className="muted" style={{fontSize:11}}>
+                {role==='admin' ? 'โหมดผู้ดูแลระบบ' : `เทอม ${state.currentTerm}/${state.currentYear}`}
               </div>
             </div>
-            <div className="row" style={{gap:6}}>
+            <div style={{display:'flex', gap:6, flexShrink:0}}>
               <button className="icon-btn" style={{width:32,height:32,fontSize:14}}
                 onClick={()=>setProfileOpen(true)} title="โปรไฟล์ของฉัน">
                 <Icon name="user" size={14}/>
