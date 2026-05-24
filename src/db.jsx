@@ -248,54 +248,68 @@ async function dbMutate(state, action){
       const { data: sess } = await sb.auth.getSession();
       const uid = sess?.session?.user?.id;
       if(!uid) throw new Error('ต้อง login ก่อน');
-      const path = `${uid}/avatar.jpg`;
-      console.info('[avatar] step 1/4 uploading to bucket=avatars path=', path, 'size=', action.blob.size, 'type=', action.blob.type);
+      // unique filename per upload — กัน CDN cache + browser cache เก่า
+      const stamp = Date.now();
+      const path = `${uid}/avatar-${stamp}.jpg`;
+      console.info('[avatar] step 1/5 uploading bucket=avatars path=', path, 'size=', action.blob.size, 'type=', action.blob.type);
       const { data: upData, error: upErr } = await sb.storage.from('avatars').upload(path, action.blob, {
         contentType: 'image/jpeg',
-        upsert: true,
+        upsert: false,
         cacheControl: '3600',
       });
       if(upErr){
         console.error('[avatar] upload FAILED', upErr);
-        // make Storage RLS / bucket errors crystal clear
         const hint = (upErr.statusCode === '404' || /Bucket not found/i.test(upErr.message||''))
-          ? '\n\nสาเหตุน่าจะเป็น: ยังไม่ได้สร้าง bucket "avatars" บน Supabase\nแก้: SQL Editor → รัน block สร้าง bucket จาก supabase/schema.sql'
+          ? '\n\nสาเหตุ: ยังไม่ได้สร้าง bucket "avatars"\nแก้: SQL Editor → รัน block สร้าง bucket จาก supabase/schema.sql'
           : (/row-level security|violates RLS|new row violates/i.test(upErr.message||''))
-            ? '\n\nสาเหตุน่าจะเป็น: ยังไม่ได้ตั้ง storage policies\nแก้: SQL Editor → รัน block "avatars_owner_insert" จาก supabase/schema.sql'
+            ? '\n\nสาเหตุ: ยังไม่ได้ตั้ง storage policies\nแก้: SQL Editor → รัน block avatars_owner_insert จาก supabase/schema.sql'
             : '';
         throw new Error('อัปโหลดรูปไม่สำเร็จ: ' + (upErr.message || JSON.stringify(upErr)) + hint);
       }
-      console.info('[avatar] step 2/4 upload OK', upData);
+      console.info('[avatar] step 2/5 upload OK', upData);
       const { data: pub } = sb.storage.from('avatars').getPublicUrl(path);
-      const url = pub.publicUrl + '?v=' + Date.now();
-      console.info('[avatar] step 3/4 public URL =', url);
-      // ดึงรูปกลับมาเพื่อยืนยันว่าเข้าถึงได้จริง (กันกรณี bucket ไม่ได้ตั้ง public read)
+      const url = pub.publicUrl;
+      console.info('[avatar] step 3/5 public URL =', url);
+      console.info('[avatar] >>> เปิด URL นี้ในแท็บใหม่เพื่อทดสอบว่าเข้าถึงได้:', url);
+      // ดึงรูปกลับมา + log content-type
       try {
         const r = await fetch(url, { cache:'no-store' });
+        console.info('[avatar] step 4/5 verify GET status=', r.status, 'content-type=', r.headers.get('content-type'));
         if(!r.ok){
-          console.error('[avatar] verify GET failed', r.status, r.statusText);
-          throw new Error(`ตรวจสอบรูปไม่สำเร็จ (HTTP ${r.status}) — bucket อาจยังไม่ public หรือ policy ไม่ครบ`);
+          throw new Error(`HTTP ${r.status} ${r.statusText} — bucket อาจยังไม่ public หรือ policy SELECT ไม่ครบ`);
         }
         const blob = await r.blob();
-        console.info('[avatar] verify GET OK', blob.size, 'bytes type=', blob.type);
+        console.info('[avatar] step 4/5 verify GET OK', blob.size, 'bytes');
       } catch(e){
         console.error('[avatar] verify GET threw', e);
         throw new Error('ดึงรูปกลับมาไม่ได้: ' + (e.message || e));
       }
+      // ลบไฟล์รูปเก่าของ user คนนี้ (best-effort)
+      try {
+        const { data: oldFiles } = await sb.storage.from('avatars').list(uid);
+        const toDelete = (oldFiles || [])
+          .filter(f => f.name && f.name !== `avatar-${stamp}.jpg`)
+          .map(f => `${uid}/${f.name}`);
+        if(toDelete.length) await sb.storage.from('avatars').remove(toDelete);
+      } catch(e){ console.warn('[avatar] cleanup old files failed', e); }
       const { error: rpcErr } = await sb.rpc('update_my_photo', { p_photo_url: url });
       if(rpcErr){
-        console.error('[avatar] step 4/4 rpc update_my_photo FAILED', rpcErr);
+        console.error('[avatar] step 5/5 rpc update_my_photo FAILED', rpcErr);
         throw new Error('บันทึก URL ลง DB ไม่สำเร็จ: ' + rpcErr.message);
       }
-      console.info('[avatar] step 4/4 DB updated OK — done');
+      console.info('[avatar] step 5/5 DB updated OK — done. Saved URL=', url);
       return { type:'self-update-photo', photoUrl: url };
     }
     case 'self-remove-photo': {
       const { data: sess } = await sb.auth.getSession();
       const uid = sess?.session?.user?.id;
       if(!uid) throw new Error('ต้อง login ก่อน');
-      // best-effort ลบไฟล์ออกจาก storage; ถ้าไฟล์ไม่มีก็ ignore
-      await sb.storage.from('avatars').remove([`${uid}/avatar.jpg`]).catch(()=>{});
+      // ลบไฟล์ทั้งหมดใน folder ของ user (รวมไฟล์ avatar-{timestamp}.jpg และไฟล์เก่า avatar.jpg)
+      try {
+        const { data: files } = await sb.storage.from('avatars').list(uid);
+        const paths = (files || []).map(f => `${uid}/${f.name}`);
+        if(paths.length) await sb.storage.from('avatars').remove(paths);
+      } catch(e){ console.warn('[avatar] remove cleanup failed', e); }
       const { error } = await sb.rpc('update_my_photo', { p_photo_url: null });
       if(error) throw error;
       return action;

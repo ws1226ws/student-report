@@ -323,17 +323,20 @@ function AvatarBubble({photoUrl, color='#FF6E8A', initial='', size=44, radius='5
   const showImg = photoUrl && !err;
   if(showImg){
     return (
-      <div style={baseStyle}>
+      <div style={baseStyle} title={photoUrl}>
         <img
+          key={photoUrl}
           src={photoUrl}
           alt=""
+          referrerPolicy="no-referrer"
           style={{width:'100%',height:'100%',objectFit:'cover',display:'block'}}
-          onError={()=>{ console.warn('AvatarBubble: image failed', photoUrl); setErr(true); }}
+          onLoad={()=>console.info('[AvatarBubble] image loaded:', photoUrl)}
+          onError={()=>{ console.error('[AvatarBubble] image FAILED to load:', photoUrl); setErr(true); }}
         />
       </div>
     );
   }
-  return <div style={{...baseStyle, background:`linear-gradient(135deg,${color},${shade(color,-25)})`}}>{initial}</div>;
+  return <div style={{...baseStyle, background:`linear-gradient(135deg,${color},${shade(color,-25)})`}} title={photoUrl ? '⚠️ image failed: '+photoUrl : ''}>{initial}</div>;
 }
 
 /* ---------- AvatarEditor: เลือกไฟล์ → drag/zoom → crop เป็น JPEG blob ----------
