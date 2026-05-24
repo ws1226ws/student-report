@@ -69,6 +69,7 @@ function reducer(state, action){
     }
     case 'self-update-photo': {
       const photoUrl = action.photoUrl || null;
+      console.info('[reducer] self-update-photo →', photoUrl, 'state.user.id=', state.user?.id);
       return {
         ...state,
         user:     {...state.user, photoUrl},
@@ -351,7 +352,7 @@ function App(){
         <div className="main">{page}</div>
       </main>
 
-      <SelfProfileModal open={profileOpen} onClose={()=>setProfileOpen(false)} user={state.user} dispatch={dispatch}/>
+      <SelfProfileModal open={profileOpen} onClose={()=>setProfileOpen(false)} user={state.user} dispatch={dispatchDb}/>
 
       {toast.node}
     </div>
@@ -391,10 +392,9 @@ function SelfProfileModal({open, onClose, user, dispatch}){
     try {
       setBusy(true);
       await dispatch({type:'self-update-photo', blob});
-      // success — บอกผู้ใช้แบบชัดๆ
       alert('อัปโหลดรูปโปรไฟล์เรียบร้อย');
     } catch(e){
-      // dispatcher แสดง toast แล้ว แต่ alert ด้วยเพื่อให้เห็นชัด
+      console.error('[upload] error', e);
       alert('อัปโหลดรูปไม่สำเร็จ\n\n' + (e?.message || e) + '\n\nดูรายละเอียดเพิ่มเติมที่ DevTools → Console');
     } finally { setBusy(false); }
   };
