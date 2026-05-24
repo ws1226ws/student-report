@@ -124,6 +124,7 @@ function syncGlobals(state){
 function App(){
   const [state, dispatch] = useReducer(reducer, undefined, initialState);
   const [route, setRoute] = useState('dashboard');
+  const [studentsGrade, setStudentsGrade] = useState('all'); // จำห้องที่กรองไว้ในหน้านักเรียน
   const [bootError, setBootError] = useState('');
   const [profileOpen, setProfileOpen] = useState(false);
   const toast = useToast();
@@ -217,7 +218,7 @@ function App(){
     page = <PageDashboard state={state} dispatch={dispatchDb} go={go}/>;
   } else if(route==='students'){
     pageTitle='นักเรียน'; crumb='จัดการนักเรียน';
-    page = <PageStudents state={state} dispatch={dispatchDb} go={go}/>;
+    page = <PageStudents state={state} dispatch={dispatchDb} go={go} grade={studentsGrade} setGrade={setStudentsGrade}/>;
   } else if(route.startsWith('student:')){
     const id = route.slice('student:'.length);
     pageTitle='ข้อมูลนักเรียน'; crumb='นักเรียน › รายบุคคล';

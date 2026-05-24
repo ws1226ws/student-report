@@ -1,8 +1,7 @@
 /* === Students List page === */
 
-function PageStudents({state, dispatch, go}){
+function PageStudents({state, dispatch, go, grade='all', setGrade=()=>{}}){
   const [search, setSearch] = useState('');
-  const [grade, setGrade] = useState('all');
   const [editing, setEditing] = useState(null); // student or 'new'
   const [selected, setSelected] = useState([]); // array of ids
   const [selectMode, setSelectMode] = useState(false);
