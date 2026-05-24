@@ -184,12 +184,17 @@ function BehaviorForm({state, preselectStudentId, initial, onCancel, onSave}){
   const orderedRooms = ['ป.3/1','ป.3/2','ป.3/3'];
   const rooms = orderedRooms.filter(r => state.students.some(s=>s.grade===r));
 
+  const roomIdx = (g)=>{ const i = orderedRooms.indexOf(g); return i===-1 ? 999 : i; };
   const filteredStudents = state.students.filter(s => {
     if(room!=='all' && s.grade!==room) return false;
     if(!studentQuery) return true;
     const q = studentQuery.toLowerCase();
     return (s.firstName+s.lastName+s.nickname+s.no).toLowerCase().includes(q);
-  }).slice(0,12);
+  }).sort((a,b)=>{
+    const r = roomIdx(a.grade) - roomIdx(b.grade);
+    if(r !== 0) return r;
+    return (a.no || 0) - (b.no || 0);
+  });
 
   const selected = state.students.find(s=>s.id===studentId);
 
