@@ -298,10 +298,31 @@ function App(){
                 size={40}
                 radius={14}
               />
-              <div>
-                <div style={{fontWeight:600,fontSize:13}}>
-                  {role==='admin' ? 'admin' : (state.user.name || state.user.id || 'ครูประจำชั้น')}
-                </div>
+              <div style={{minWidth:0, flex:1}}>
+                {(() => {
+                  if(role==='admin'){
+                    return <div style={{fontWeight:600,fontSize:13}}>admin</div>;
+                  }
+                  const full = state.user.name || state.user.id || 'ครูประจำชั้น';
+                  // แยกชื่อจริงกับวงเล็บ (ชื่อเล่น) ออกเป็น 2 บรรทัด
+                  const m = full.match(/^(.+?)\s*(\([^)]*\))\s*$/);
+                  const main = m ? m[1] : full;
+                  const paren = m ? m[2] : null;
+                  return (
+                    <>
+                      <div title={full} style={{
+                        fontWeight:600, fontSize:13, lineHeight:1.2,
+                        whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis',
+                      }}>{main}</div>
+                      {paren && (
+                        <div title={paren} style={{
+                          fontSize:11, color:'var(--ink-3)', lineHeight:1.2,
+                          whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis',
+                        }}>{paren}</div>
+                      )}
+                    </>
+                  );
+                })()}
                 <div className="muted" style={{fontSize:11}}>
                   {role==='admin' ? 'โหมดผู้ดูแลระบบ' : `เทอม ${state.currentTerm}/${state.currentYear}`}
                 </div>
