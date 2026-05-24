@@ -314,11 +314,6 @@ function App(){
             <span className="pill violet" style={{padding:'8px 14px', fontWeight:600}}>
               📅 เทอม {state.currentTerm}/{state.currentYear}
             </span>
-            <div className="search">
-              <Icon name="search" size={16} color="#8A7FA0"/>
-              <input placeholder="ค้นหาทุกอย่าง..."/>
-            </div>
-            <button className="icon-btn"><Icon name="bell" size={18}/><span className="dot"/></button>
           </div>
         </div>
 
