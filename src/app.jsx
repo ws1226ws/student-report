@@ -300,7 +300,7 @@ function App(){
               />
               <div>
                 <div style={{fontWeight:600,fontSize:13}}>
-                  {role==='admin' ? 'admin' : 'ครูประจำชั้น'}
+                  {role==='admin' ? 'admin' : (state.user.name || state.user.id || 'ครูประจำชั้น')}
                 </div>
                 <div className="muted" style={{fontSize:11}}>
                   {role==='admin' ? 'โหมดผู้ดูแลระบบ' : `เทอม ${state.currentTerm}/${state.currentYear}`}
