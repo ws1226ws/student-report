@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:api.anthropic.com)",
+      "Bash(gunzip -c \"/Users/vegasmacmini/.claude/projects/-Users-vegasmacmini-Documents-Claude-Code-student-report/f426ef9b-6055-471b-b99c-3a3f335d4e49/tool-results/webfetch-1779590797129-kkpewf.bin\")",
+      "Bash(tar -xf payload.bin)",
+      "Bash(python3 -m http.server 8000)",
+      "Bash(curl -s -o /dev/null -w \"HTTP %{http_code}\\\\n\" http://localhost:8000/index.html)",
+      "Bash(curl -s -o /dev/null -w \"HTTP %{http_code} src/app.jsx\\\\n\" http://localhost:8000/src/app.jsx)",
+      "Bash(python3 -c ' *)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code} app.jsx\\\\n\" \"http://localhost:8000/src/app.jsx\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code} data.jsx\\\\n\" \"http://localhost:8000/src/data.jsx\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code} page-admin.jsx\\\\n\" \"http://localhost:8000/src/page-admin.jsx\")",
+      "Bash(git init *)",
+      "Bash(git add *)",
+      "Bash(git -c user.email=local@student.report -c 'user.name=Local Setup' commit -q -m 'Initial: Student Report app with Supabase backend *)"
+    ]
+  }
+}

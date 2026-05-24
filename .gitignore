@@ -1,0 +1,19 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Local config (เผื่ออยากแยก credentials ออกจาก git)
+# ปกติ config.js จะถูก commit (เพราะ anon key เปิดเผยได้)
+# ถ้าอยาก gitignore: ยกเลิก comment บรรทัดด้านล่าง
+#src/config.js
+
+# Misc
+.cache/
