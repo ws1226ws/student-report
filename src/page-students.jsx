@@ -9,12 +9,21 @@ function PageStudents({state, dispatch, go, grade='all', setGrade=()=>{}}){
   const orderedRooms = ['ป.3/1','ป.3/2','ป.3/3'];
   const grades = ['all', ...orderedRooms.filter(r=>state.students.some(s=>s.grade===r))];
 
+  const roomOrder = (g)=>{
+    const i = orderedRooms.indexOf(g);
+    return i === -1 ? 999 : i;
+  };
   const filtered = state.students.filter(s => {
     if(grade!=='all' && s.grade!==grade) return false;
     if(!search) return true;
     const q = search.toLowerCase();
     return [s.firstName, s.lastName, s.nickname, String(s.no)].some(x=>String(x).toLowerCase().includes(q));
-  }).sort((a,b)=>a.no-b.no);
+  }).sort((a,b)=>{
+    // ดูทั้งหมด → เรียงห้องก่อน (ป.3/1 → ป.3/2 → ป.3/3) แล้วเลขที่
+    const r = roomOrder(a.grade) - roomOrder(b.grade);
+    if(r !== 0) return r;
+    return (a.no || 0) - (b.no || 0);
+  });
 
   const toggleSelect = (id)=>setSelected(arr => arr.includes(id) ? arr.filter(x=>x!==id) : [...arr, id]);
   const selectAll = ()=>setSelected(filtered.map(s=>s.id));
