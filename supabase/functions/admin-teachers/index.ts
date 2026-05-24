@@ -149,6 +149,58 @@ Deno.serve(async (req) => {
       return json({ ok: true });
     }
 
+    // ---------- set_username ----------
+    if (action === 'set_username') {
+      const oldUsername = String(body.username || '').trim().toLowerCase();
+      const newUsername = String(body.new_username || '').trim().toLowerCase();
+      if (!oldUsername || !newUsername)
+        return json({ error: 'ต้องระบุทั้ง username เดิมและใหม่' }, 400);
+      if (!/^[a-z0-9_]{2,32}$/.test(newUsername))
+        return json({ error: 'username ใหม่ต้องเป็น a-z, 0-9, _ ความยาว 2-32' }, 400);
+      if (oldUsername === newUsername)
+        return json({ error: 'username ใหม่เหมือนเดิม' }, 400);
+
+      const { data: target } = await admin
+        .from('profiles')
+        .select('user_id, role')
+        .eq('username', oldUsername)
+        .maybeSingle();
+      if (!target) return json({ error: 'ไม่พบบัญชีนี้' }, 404);
+      if (target.role === 'admin' && target.user_id !== callerId)
+        return json({ error: 'ห้ามเปลี่ยน username ของ admin คนอื่น' }, 400);
+
+      const { data: dup } = await admin
+        .from('profiles')
+        .select('user_id')
+        .eq('username', newUsername)
+        .maybeSingle();
+      if (dup) return json({ error: `username "${newUsername}" ถูกใช้แล้ว` }, 409);
+
+      // 1) update email (เพื่อให้ login ด้วย username ใหม่ได้)
+      const newEmail = newUsername + EMAIL_SUFFIX;
+      const { error: emailErr } = await admin.auth.admin.updateUserById(
+        target.user_id,
+        { email: newEmail, email_confirm: true },
+      );
+      if (emailErr) return json({ error: 'อัปเดต email ไม่สำเร็จ: ' + emailErr.message }, 400);
+
+      // 2) update profile.username
+      const { error: profErr } = await admin
+        .from('profiles')
+        .update({ username: newUsername })
+        .eq('user_id', target.user_id);
+      if (profErr) {
+        // rollback email
+        await admin.auth.admin.updateUserById(target.user_id, {
+          email: oldUsername + EMAIL_SUFFIX,
+          email_confirm: true,
+        });
+        return json({ error: profErr.message }, 400);
+      }
+
+      return json({ ok: true, old_username: oldUsername, new_username: newUsername });
+    }
+
     // ---------- set_password ----------
     if (action === 'set_password') {
       const username = String(body.username || '').trim().toLowerCase();
@@ -173,7 +225,7 @@ Deno.serve(async (req) => {
       return json({ ok: true });
     }
 
-    return json({ error: 'action ไม่รู้จัก (รองรับ create/delete/set_password)' }, 400);
+    return json({ error: 'action ไม่รู้จัก (รองรับ create/delete/set_password/set_username)' }, 400);
   } catch (e) {
     console.error('admin-teachers error:', e);
     return json({ error: (e as Error)?.message || String(e) }, 500);

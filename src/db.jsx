@@ -224,6 +224,10 @@ async function dbMutate(state, action){
       await callAdminFn('set_password', { username: action.id, password: action.password });
       return action; // no state change — reducer ไม่ต้องทำอะไร
     }
+    case 'teacher-set-username': {
+      await callAdminFn('set_username', { username: action.id, new_username: action.newId });
+      return action;
+    }
     case 'self-set-password': {
       // admin/ครูเปลี่ยนรหัสตัวเอง — ไม่ต้องผ่าน edge function
       const { error } = await sb.auth.updateUser({ password: action.password });

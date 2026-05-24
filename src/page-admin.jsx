@@ -111,6 +111,7 @@ function AdminTeachers({state, dispatch}){
   const [creating, setCreating] = useState(null); // เพิ่มครูใหม่
   const [pwTarget, setPwTarget] = useState(null); // เปลี่ยนรหัส (ของ user คนอื่น)
   const [selfPw, setSelfPw]     = useState(null); // เปลี่ยนรหัสตัวเอง
+  const [unameTarget, setUnameTarget] = useState(null); // เปลี่ยน Username
   const [busy, setBusy] = useState(false);
 
   const startCreate = ()=> setCreating({ username:'', password:'', name:'', avatar:'#FF6E8A' });
@@ -159,6 +160,9 @@ function AdminTeachers({state, dispatch}){
                   <div className="row" style={{flexWrap:'wrap', gap:6}}>
                     <button className="btn btn-soft btn-sm" onClick={()=>setEditing({...t})}>
                       <Icon name="edit" size={11}/> แก้ชื่อ/สี
+                    </button>
+                    <button className="btn btn-soft-sky btn-sm" onClick={()=>setUnameTarget({ id:t.id, name:t.name, newId:t.id })}>
+                      <Icon name="edit" size={11}/> เปลี่ยน Username
                     </button>
                     <button className="btn btn-soft-violet btn-sm" onClick={()=>setPwTarget({ id:t.id, name:t.name, password:'', confirm:'' })}>
                       <Icon name="lock" size={11}/> เปลี่ยนรหัส
@@ -273,6 +277,41 @@ function AdminTeachers({state, dispatch}){
                   alert(`สร้างบัญชี "${creating.username}" เรียบร้อย — login ได้ทันที`);
                 } catch(e) {} finally { setBusy(false); }
               }}><Icon name="plus" size={14}/> สร้างบัญชี</button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* === Modal: เปลี่ยน Username === */}
+      <Modal open={!!unameTarget} onClose={()=>setUnameTarget(null)}
+        title="เปลี่ยน Username"
+        subtitle={unameTarget ? `บัญชีเดิม: ${unameTarget.id}${unameTarget.name?' · '+unameTarget.name:''}` : ''}>
+        {unameTarget && (
+          <div className="stack-lg" style={{marginTop:12}}>
+            <div className="notice" style={{background:'#FFEBC2',color:'#A56A00'}}>
+              <span className="dot" style={{background:'#A56A00'}}/>
+              <span>การเปลี่ยน Username จะอัปเดต email สำหรับ login ด้วย — ครั้งถัดไปต้อง login ด้วย Username ใหม่</span>
+            </div>
+            <div className="field">
+              <label>Username ใหม่ (a-z, 0-9, _ ความยาว 2-32)</label>
+              <input
+                value={unameTarget.newId}
+                onChange={e=>setUnameTarget({...unameTarget, newId:e.target.value.toLowerCase().replace(/[^a-z0-9_]/g,'')})}
+                placeholder="เช่น t2"
+              />
+            </div>
+            <div className="row" style={{justifyContent:'flex-end',gap:10}}>
+              <button className="btn btn-ghost" onClick={()=>setUnameTarget(null)}>ยกเลิก</button>
+              <button className="btn btn-violet" disabled={busy} onClick={async ()=>{
+                if(!unameTarget.newId || unameTarget.newId.length<2){ alert('Username ต้องอย่างน้อย 2 ตัว'); return; }
+                if(unameTarget.newId === unameTarget.id){ alert('Username ใหม่เหมือนเดิม'); return; }
+                try {
+                  setBusy(true);
+                  await dispatch({type:'teacher-set-username', id:unameTarget.id, newId:unameTarget.newId});
+                  setUnameTarget(null);
+                  alert(`เปลี่ยน Username เป็น "${unameTarget.newId}" เรียบร้อย`);
+                } catch(e) {} finally { setBusy(false); }
+              }}><Icon name="save" size={14}/> บันทึก Username ใหม่</button>
             </div>
           </div>
         )}

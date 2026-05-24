@@ -56,6 +56,8 @@ function reducer(state, action){
     case 'teacher-set-password':
     case 'self-set-password':
       return state; // ไม่มี state ต้องเปลี่ยน — password ไม่เก็บใน client
+    case 'teacher-set-username':
+      return {...state, teachers: state.teachers.map(t => t.id===action.id ? {...t, id:action.newId} : t)};
 
     case 'set-term':
       return {...state, currentTerm: action.term, currentYear: action.year};
