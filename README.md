@@ -162,3 +162,5 @@ Function จะตรวจสอบ JWT ของ caller ว่าเป็น 
 | เพิ่ม/ลบครูแล้วขึ้น "Failed to fetch" / 404 | ยังไม่ deploy edge function | ดูหัวข้อ "Edge Function" ด้านบน |
 | เพิ่มครู → "เฉพาะ admin เท่านั้น" | profile ของคุณยังเป็น `teacher` | SQL Editor: `update public.profiles set role='admin' where username='admin';` |
 | โปรไฟล์ของฉัน → บันทึกแล้วขึ้น "function update_my_profile does not exist" | ยังไม่ได้รัน SQL function ตัวใหม่ | SQL Editor → คัดลอกบล็อก `create or replace function public.update_my_profile...` จาก [supabase/schema.sql](supabase/schema.sql) → Run |
+| อัปโหลดรูปแล้วขึ้น "Bucket not found" หรือ "new row violates row-level security" | ยังไม่ได้สร้าง bucket `avatars` หรือยังไม่มี policies | SQL Editor → คัดลอกบล็อก `insert into storage.buckets ...` + นโยบาย `avatars_*` จาก [supabase/schema.sql](supabase/schema.sql) → Run |
+| รูปอัปขึ้นแล้วแต่ไม่แสดง / ขึ้น "Failed to load" | ยังไม่ได้เพิ่ม column `photo_url` ใน profiles | SQL Editor: `alter table public.profiles add column if not exists photo_url text;` |

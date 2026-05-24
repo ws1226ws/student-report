@@ -16,8 +16,10 @@ create table if not exists public.profiles (
   full_name  text,
   role       text not null check (role in ('admin','teacher')) default 'teacher',
   avatar     text,
+  photo_url  text,
   created_at timestamptz default now()
 );
+alter table public.profiles add column if not exists photo_url text;
 
 -- =============================================================
 -- 2) app_settings  (singleton row)
@@ -152,6 +154,66 @@ begin
 end;
 $$;
 grant execute on function public.update_my_profile(text, text) to authenticated;
+
+-- =============================================================
+-- update_my_photo(p_photo_url)
+-- p_photo_url = NULL หรือ '' → เคลียร์รูปกลับเป็น avatar สี
+-- p_photo_url = URL → ตั้งรูปใหม่ (URL จาก Storage)
+-- =============================================================
+create or replace function public.update_my_photo(p_photo_url text)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if auth.uid() is null then
+    raise exception 'ต้อง login ก่อน';
+  end if;
+  update public.profiles
+    set photo_url = nullif(trim(coalesce(p_photo_url, '')), '')
+    where user_id = auth.uid();
+end;
+$$;
+grant execute on function public.update_my_photo(text) to authenticated;
+
+-- =============================================================
+-- Storage bucket: avatars (public read · owner write)
+-- =============================================================
+insert into storage.buckets (id, name, public)
+values ('avatars', 'avatars', true)
+on conflict (id) do update set public = true;
+
+-- public read
+drop policy if exists "avatars_public_read" on storage.objects;
+create policy "avatars_public_read" on storage.objects
+  for select to public using ( bucket_id = 'avatars' );
+
+-- authenticated upload — เฉพาะใต้ folder ของ user_id ตัวเอง
+drop policy if exists "avatars_owner_insert" on storage.objects;
+create policy "avatars_owner_insert" on storage.objects
+  for insert to authenticated
+  with check (
+    bucket_id = 'avatars'
+    and (storage.foldername(name))[1] = auth.uid()::text
+  );
+
+-- update / delete ของตัวเอง
+drop policy if exists "avatars_owner_update" on storage.objects;
+create policy "avatars_owner_update" on storage.objects
+  for update to authenticated
+  using (
+    bucket_id = 'avatars'
+    and (storage.foldername(name))[1] = auth.uid()::text
+  );
+
+drop policy if exists "avatars_owner_delete" on storage.objects;
+create policy "avatars_owner_delete" on storage.objects
+  for delete to authenticated
+  using (
+    bucket_id = 'avatars'
+    and (storage.foldername(name))[1] = auth.uid()::text
+  );
 
 -- =============================================================
 -- RLS

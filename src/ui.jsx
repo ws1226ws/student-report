@@ -256,6 +256,225 @@ function PasswordField({label, value, onChange, placeholder='••••••�
   );
 }
 
+/* ---------- AvatarBubble: ใช้แทนวงกลม avatar ทุกที่
+   ถ้ามี photoUrl → แสดงรูป (cover); ถ้าไม่มี → gradient จาก color + initial
+*/
+function AvatarBubble({photoUrl, color='#FF6E8A', initial='', size=44, radius='50%'}){
+  const style = {
+    width:size, height:size, borderRadius:radius,
+    display:'grid', placeItems:'center',
+    color:'#fff', fontWeight:700, fontSize:Math.round(size*0.42),
+    overflow:'hidden', flexShrink:0,
+    boxShadow:'0 4px 10px -4px rgba(0,0,0,.15)',
+  };
+  if(photoUrl){
+    return <div style={style}><img src={photoUrl} alt="" style={{width:'100%',height:'100%',objectFit:'cover',display:'block'}} onError={(e)=>{e.target.style.display='none';}}/></div>;
+  }
+  return <div style={{...style, background:`linear-gradient(135deg,${color},${shade(color,-25)})`}}>{initial}</div>;
+}
+
+/* ---------- AvatarEditor: เลือกไฟล์ → drag/zoom → crop เป็น JPEG blob ----------
+   props:
+     initialPhotoUrl: รูปปัจจุบัน (ถ้ามี — แสดง preview ก่อน)
+     onUpload(blob): callback เมื่อกด "บันทึกรูป" — ส่ง blob ของ 256x256 JPEG
+     onRemove():     callback เมื่อกด "ลบรูป"
+     busy:           disable ปุ่มขณะกำลังอัปโหลด
+*/
+function AvatarEditor({initialPhotoUrl, onUpload, onRemove, busy}){
+  const PREVIEW = 240; // px ของช่อง crop
+  const fileInputRef = useRef(null);
+  const [imgSrc, setImgSrc] = useState(null);          // data url ของไฟล์ใหม่
+  const [naturalSize, setNaturalSize] = useState({w:0,h:0});
+  const [pos, setPos] = useState({x:0, y:0});
+  const [scale, setScale] = useState(1);
+  const [dragging, setDragging] = useState(false);
+  const dragStartRef = useRef({sx:0,sy:0, px:0, py:0});
+  const imgRef = useRef(null);
+
+  const reset = ()=>{ setPos({x:0,y:0}); setScale(1); };
+
+  const pickFile = (e)=>{
+    const f = e.target.files?.[0];
+    e.target.value = ''; // reset เผื่อเลือกไฟล์เดิมซ้ำ
+    if(!f) return;
+    if(!/^image\//.test(f.type)){ alert('กรุณาเลือกไฟล์รูปภาพ'); return; }
+    if(f.size > 5*1024*1024){ alert('ไฟล์ใหญ่เกิน 5MB กรุณาเลือกรูปขนาดเล็กลง'); return; }
+    const reader = new FileReader();
+    reader.onload = (ev)=>{ setImgSrc(ev.target.result); reset(); };
+    reader.readAsDataURL(f);
+  };
+
+  const onImgLoad = ()=>{
+    if(!imgRef.current) return;
+    setNaturalSize({w: imgRef.current.naturalWidth, h: imgRef.current.naturalHeight});
+  };
+
+  // base scale ที่ทำให้ภาพ "cover" ช่อง PREVIEW (เริ่มต้น)
+  const baseScale = naturalSize.w && naturalSize.h
+    ? Math.max(PREVIEW / naturalSize.w, PREVIEW / naturalSize.h)
+    : 1;
+  const effScale = baseScale * scale;
+  const renderedW = naturalSize.w * effScale;
+  const renderedH = naturalSize.h * effScale;
+
+  // Drag
+  const startDrag = (clientX, clientY)=>{
+    setDragging(true);
+    dragStartRef.current = { sx:clientX, sy:clientY, px:pos.x, py:pos.y };
+  };
+  const moveDrag = (clientX, clientY)=>{
+    if(!dragging) return;
+    const dx = clientX - dragStartRef.current.sx;
+    const dy = clientY - dragStartRef.current.sy;
+    // clamp ไม่ให้ image หลุดขอบ
+    const maxX = Math.max(0, (renderedW - PREVIEW)/2);
+    const maxY = Math.max(0, (renderedH - PREVIEW)/2);
+    const nx = Math.max(-maxX, Math.min(maxX, dragStartRef.current.px + dx));
+    const ny = Math.max(-maxY, Math.min(maxY, dragStartRef.current.py + dy));
+    setPos({x:nx, y:ny});
+  };
+  const endDrag = ()=> setDragging(false);
+
+  useEffect(()=>{
+    if(!dragging) return;
+    const onMove = (e)=>{
+      if(e.touches){ moveDrag(e.touches[0].clientX, e.touches[0].clientY); }
+      else { moveDrag(e.clientX, e.clientY); }
+    };
+    const onUp = ()=> endDrag();
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    window.addEventListener('touchmove', onMove, {passive:false});
+    window.addEventListener('touchend', onUp);
+    return ()=>{
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+      window.removeEventListener('touchmove', onMove);
+      window.removeEventListener('touchend', onUp);
+    };
+  }, [dragging, naturalSize, scale, pos.x, pos.y]);
+
+  const renderBlob = ()=>{
+    return new Promise((resolve)=>{
+      if(!imgRef.current || !naturalSize.w){ resolve(null); return; }
+      const OUT = 256;
+      const cv = document.createElement('canvas');
+      cv.width = OUT; cv.height = OUT;
+      const ctx = cv.getContext('2d');
+      // กล่อง crop คือศูนย์กลาง PREVIEW; image จุดศูนย์กลางอยู่ที่ (PREVIEW/2 + pos.x, PREVIEW/2 + pos.y)
+      // → top-left ของ image (preview coords)
+      const left = PREVIEW/2 + pos.x - renderedW/2;
+      const top  = PREVIEW/2 + pos.y - renderedH/2;
+      // scale จาก PREVIEW → OUT
+      const k = OUT / PREVIEW;
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(0,0,OUT,OUT);
+      ctx.drawImage(imgRef.current, left*k, top*k, renderedW*k, renderedH*k);
+      cv.toBlob((b)=> resolve(b), 'image/jpeg', 0.88);
+    });
+  };
+
+  const handleSave = async ()=>{
+    if(!imgSrc){ alert('กรุณาเลือกรูปก่อน'); return; }
+    const blob = await renderBlob();
+    if(!blob){ alert('ประมวลผลรูปไม่สำเร็จ'); return; }
+    await onUpload(blob);
+    setImgSrc(null); // ปิดโหมด edit หลังอัปโหลดเสร็จ
+  };
+
+  // ไม่มีรูปใหม่ — แสดง preview ปัจจุบัน + ปุ่ม "อัปโหลดรูปใหม่"
+  if(!imgSrc){
+    return (
+      <div className="stack" style={{textAlign:'center'}}>
+        <div style={{display:'flex',justifyContent:'center',marginBottom:6}}>
+          {initialPhotoUrl
+            ? <img src={initialPhotoUrl} alt="profile"
+                style={{width:140,height:140,borderRadius:'50%',objectFit:'cover',
+                        boxShadow:'0 10px 24px -10px rgba(80,40,80,.25)',background:'#FFF7EF'}}/>
+            : <div style={{width:140,height:140,borderRadius:'50%',background:'#FFF7EF',
+                           display:'grid',placeItems:'center',color:'var(--ink-3)',fontSize:48,
+                           boxShadow:'0 10px 24px -10px rgba(80,40,80,.25)'}}>📷</div>}
+        </div>
+        <input ref={fileInputRef} type="file" accept="image/*" onChange={pickFile} style={{display:'none'}}/>
+        <div className="row" style={{justifyContent:'center', gap:8}}>
+          <button className="btn btn-soft-sky btn-sm" disabled={busy} onClick={()=>fileInputRef.current?.click()}>
+            <Icon name="image" size={12}/> {initialPhotoUrl ? 'เปลี่ยนรูป' : 'เลือกรูป'}
+          </button>
+          {initialPhotoUrl && (
+            <button className="btn btn-soft btn-sm" disabled={busy}
+              style={{background:'#FFE0EA',color:'#C24B5C'}}
+              onClick={async ()=>{ if(confirm('ลบรูปโปรไฟล์?')) await onRemove(); }}>
+              <Icon name="trash" size={12}/> ลบรูป
+            </button>
+          )}
+        </div>
+        <div className="help" style={{textAlign:'center'}}>JPG/PNG ไม่เกิน 5MB · จะถูก crop เป็นวงกลม</div>
+      </div>
+    );
+  }
+
+  // โหมด edit — drag เพื่อจัดตำแหน่ง + zoom
+  return (
+    <div className="stack">
+      <div style={{display:'flex', justifyContent:'center'}}>
+        <div
+          onMouseDown={(e)=>{e.preventDefault(); startDrag(e.clientX, e.clientY);}}
+          onTouchStart={(e)=>{ if(e.touches[0]) startDrag(e.touches[0].clientX, e.touches[0].clientY); }}
+          style={{
+            position:'relative', width:PREVIEW, height:PREVIEW,
+            borderRadius:'50%', overflow:'hidden',
+            background:'#FFF7EF', boxShadow:'0 10px 24px -10px rgba(80,40,80,.25)',
+            cursor: dragging ? 'grabbing' : 'grab',
+            touchAction:'none', userSelect:'none',
+          }}
+        >
+          {/* image positioned: center + offset */}
+          <img
+            ref={imgRef}
+            src={imgSrc}
+            alt=""
+            onLoad={onImgLoad}
+            draggable={false}
+            style={{
+              position:'absolute',
+              left:'50%', top:'50%',
+              width: renderedW, height: renderedH,
+              transform: `translate(calc(-50% + ${pos.x}px), calc(-50% + ${pos.y}px))`,
+              maxWidth:'none', pointerEvents:'none',
+            }}
+          />
+          {/* hint border */}
+          <div style={{
+            position:'absolute', inset:0, borderRadius:'50%',
+            boxShadow:'inset 0 0 0 2px rgba(255,255,255,.85), inset 0 0 0 3px rgba(0,0,0,.15)',
+            pointerEvents:'none',
+          }}/>
+        </div>
+      </div>
+
+      <div className="field" style={{maxWidth:PREVIEW, margin:'0 auto', width:'100%'}}>
+        <label>ซูม</label>
+        <input type="range" min="1" max="3" step="0.05" value={scale}
+          onChange={e=>setScale(parseFloat(e.target.value))}
+          style={{width:'100%'}}/>
+        <div className="help" style={{textAlign:'center'}}>ลากรูปเพื่อจัดตำแหน่ง · ใช้ slider ปรับซูม</div>
+      </div>
+
+      <div className="row" style={{justifyContent:'center', gap:8, flexWrap:'wrap'}}>
+        <button className="btn btn-ghost btn-sm" disabled={busy} onClick={()=>setImgSrc(null)}>ยกเลิก</button>
+        <button className="btn btn-soft-sky btn-sm" disabled={busy} onClick={()=>fileInputRef.current?.click()}>
+          <Icon name="image" size={12}/> เปลี่ยนไฟล์
+        </button>
+        <button className="btn btn-primary btn-sm" disabled={busy} onClick={handleSave}>
+          <Icon name="save" size={12}/> {busy ? 'กำลังอัปโหลด…' : 'บันทึกรูป'}
+        </button>
+      </div>
+      <input ref={fileInputRef} type="file" accept="image/*" onChange={pickFile} style={{display:'none'}}/>
+    </div>
+  );
+}
+
 Object.assign(window, {
-  Icon, Avatar, shade, StatCard, Tabs, Segmented, Modal, StrengthChip, Notice, Sparkle, PhotoSlot, Empty, useToast, PasswordField,
+  Icon, Avatar, shade, StatCard, Tabs, Segmented, Modal, StrengthChip, Notice, Sparkle, PhotoSlot, Empty, useToast,
+  PasswordField, AvatarBubble, AvatarEditor,
 });

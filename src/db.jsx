@@ -106,7 +106,7 @@ function groupToRow(g){ return { name:g.name, color:g.color, emoji:g.emoji }; }
 function catFromRow(r){ return { id:r.id, name:r.name, emoji:r.emoji, color:r.color, tone:r.tone }; }
 function catToRow(c){ return { id:c.id, name:c.name, emoji:c.emoji, color:c.color, tone:c.tone }; }
 function teacherFromProfile(p){
-  return { id:p.username, name:p.full_name, role:p.role, avatar:p.avatar, userId:p.user_id };
+  return { id:p.username, name:p.full_name, role:p.role, avatar:p.avatar, photoUrl:p.photo_url, userId:p.user_id };
 }
 
 /* === Hydrate ทุก table === */
@@ -240,6 +240,35 @@ async function dbMutate(state, action){
         p_name:   action.name   ?? null,
         p_avatar: action.avatar ?? null,
       });
+      if(error) throw error;
+      return action;
+    }
+    case 'self-update-photo': {
+      // อัปโหลด blob → Supabase Storage → save URL ลง profiles.photo_url
+      const { data: sess } = await sb.auth.getSession();
+      const uid = sess?.session?.user?.id;
+      if(!uid) throw new Error('ต้อง login ก่อน');
+      const path = `${uid}/avatar.jpg`;
+      const { error: upErr } = await sb.storage.from('avatars').upload(path, action.blob, {
+        contentType: 'image/jpeg',
+        upsert: true,
+        cacheControl: '3600',
+      });
+      if(upErr) throw new Error('อัปโหลดรูปไม่สำเร็จ: ' + upErr.message);
+      const { data: pub } = sb.storage.from('avatars').getPublicUrl(path);
+      // เติม ?v=<timestamp> เพื่อบังคับให้ browser refresh cache หลังเปลี่ยนรูป
+      const url = pub.publicUrl + '?v=' + Date.now();
+      const { error: rpcErr } = await sb.rpc('update_my_photo', { p_photo_url: url });
+      if(rpcErr) throw rpcErr;
+      return { type:'self-update-photo', photoUrl: url };
+    }
+    case 'self-remove-photo': {
+      const { data: sess } = await sb.auth.getSession();
+      const uid = sess?.session?.user?.id;
+      if(!uid) throw new Error('ต้อง login ก่อน');
+      // best-effort ลบไฟล์ออกจาก storage; ถ้าไฟล์ไม่มีก็ ignore
+      await sb.storage.from('avatars').remove([`${uid}/avatar.jpg`]).catch(()=>{});
+      const { error } = await sb.rpc('update_my_photo', { p_photo_url: null });
       if(error) throw error;
       return action;
     }

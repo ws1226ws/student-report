@@ -67,6 +67,20 @@ function reducer(state, action){
         teachers: state.teachers.map(t => t.id===state.user.id ? {...t, name, avatar} : t),
       };
     }
+    case 'self-update-photo': {
+      const photoUrl = action.photoUrl || null;
+      return {
+        ...state,
+        user:     {...state.user, photoUrl},
+        teachers: state.teachers.map(t => t.id===state.user.id ? {...t, photoUrl} : t),
+      };
+    }
+    case 'self-remove-photo':
+      return {
+        ...state,
+        user:     {...state.user, photoUrl: null},
+        teachers: state.teachers.map(t => t.id===state.user.id ? {...t, photoUrl: null} : t),
+      };
 
     case 'set-term':
       return {...state, currentTerm: action.term, currentYear: action.year};
@@ -177,6 +191,7 @@ function App(){
       name: profile.full_name || profile.username,
       role: profile.role,
       avatar: profile.avatar || '#FF6E8A',
+      photoUrl: profile.photo_url || null,
     }});
   }
 
@@ -275,13 +290,13 @@ function App(){
         <div style={{marginTop:'auto', padding:14, background:'#fff', borderRadius:18, boxShadow:'var(--shadow-sm)'}}>
           <div className="row" style={{justifyContent:'space-between'}}>
             <div className="row">
-              <div style={{
-                width:40,height:40,borderRadius:14,
-                background: role==='admin'
-                  ? 'var(--grad-violet)'
-                  : `linear-gradient(135deg,${state.user.avatar||'#FFB36B'},${shade(state.user.avatar||'#FF6E8A',-25)})`,
-                display:'grid',placeItems:'center',color:'#fff',fontWeight:700,fontSize:18,
-              }}>{role==='admin' ? '👑' : '🍎'}</div>
+              <AvatarBubble
+                photoUrl={state.user.photoUrl}
+                color={state.user.avatar || (role==='admin' ? '#7A5CFF' : '#FFB36B')}
+                initial={role==='admin' ? '👑' : '🍎'}
+                size={40}
+                radius={14}
+              />
               <div>
                 <div style={{fontWeight:600,fontSize:13}}>
                   {role==='admin' ? 'admin' : 'ครูประจำชั้น'}
@@ -372,6 +387,19 @@ function SelfProfileModal({open, onClose, user, dispatch}){
     } catch(e){} finally { setBusy(false); }
   };
 
+  const uploadPhoto = async (blob)=>{
+    try {
+      setBusy(true);
+      await dispatch({type:'self-update-photo', blob});
+    } catch(e){} finally { setBusy(false); }
+  };
+  const removePhoto = async ()=>{
+    try {
+      setBusy(true);
+      await dispatch({type:'self-remove-photo'});
+    } catch(e){} finally { setBusy(false); }
+  };
+
   const savePassword = async ()=>{
     if(!pwd || pwd.length<6){ alert('รหัสผ่านต้องอย่างน้อย 6 ตัวอักษร'); return; }
     if(pwd !== pwd2){ alert('รหัสผ่านยืนยันไม่ตรงกัน'); return; }
@@ -386,27 +414,36 @@ function SelfProfileModal({open, onClose, user, dispatch}){
   return (
     <Modal open={open} onClose={onClose} title="โปรไฟล์ของฉัน" subtitle={`${user.id} · ${isAdmin?'ผู้ดูแลระบบ (admin)':'ครู'}`}>
       <div className="stack-lg" style={{marginTop:12}}>
-        {/* Avatar preview */}
-        <div className="row" style={{gap:14}}>
-          <div style={{
-            width:64,height:64,borderRadius:20,
-            background:`linear-gradient(135deg,${avatar},${shade(avatar,-25)})`,
-            display:'grid',placeItems:'center',color:'#fff',fontWeight:700,fontSize:28,
-            boxShadow:'0 10px 24px -10px rgba(80,40,80,.25)',
-          }}>{isAdmin?'👑':'🍎'}</div>
-          <div className="muted" style={{fontSize:13, lineHeight:1.5}}>
-            ชื่อและสีนี้จะแสดงในระบบ — ตัวคุณเองและคนอื่นที่เห็นบันทึกของคุณจะเห็นข้อมูลนี้
+        {/* Photo */}
+        <div className="card" style={{padding:18, boxShadow:'none', background:'#FFF7EF'}}>
+          <div className="row" style={{gap:10, marginBottom:12}}>
+            <div style={{width:32,height:32,borderRadius:10,background:'var(--grad-sky)',display:'grid',placeItems:'center',color:'#fff'}}>
+              <Icon name="image" size={14}/>
+            </div>
+            <div style={{fontWeight:600}}>รูปโปรไฟล์</div>
           </div>
+          <AvatarEditor
+            initialPhotoUrl={user.photoUrl}
+            onUpload={uploadPhoto}
+            onRemove={removePhoto}
+            busy={busy}
+          />
         </div>
 
-        {/* Name + avatar */}
+        {/* Name + color */}
         <div className="card" style={{padding:18, boxShadow:'none', background:'#FFF7EF'}}>
+          <div className="row" style={{gap:10, marginBottom:12}}>
+            <div style={{width:32,height:32,borderRadius:10,background:'var(--grad-primary)',display:'grid',placeItems:'center',color:'#fff'}}>
+              <Icon name="user" size={14}/>
+            </div>
+            <div style={{fontWeight:600}}>ชื่อแสดง · สีประจำตัว</div>
+          </div>
           <div className="field">
             <label>ชื่อแสดง</label>
             <input value={name} onChange={e=>setName(e.target.value)} placeholder="เช่น ครูสมศรี ใจดี"/>
           </div>
           <div className="field" style={{marginTop:14}}>
-            <label>สีประจำตัว</label>
+            <label>สีประจำตัว (ใช้เมื่อไม่มีรูป)</label>
             <div className="row" style={{flexWrap:'wrap'}}>
               {colors.map(c => (
                 <button key={c} onClick={()=>setAvatar(c)} style={{
@@ -419,7 +456,7 @@ function SelfProfileModal({open, onClose, user, dispatch}){
           </div>
           <div className="row" style={{justifyContent:'flex-end',marginTop:14}}>
             <button className="btn btn-primary" disabled={busy} onClick={saveProfile}>
-              <Icon name="save" size={14}/> บันทึกโปรไฟล์
+              <Icon name="save" size={14}/> บันทึกชื่อ/สี
             </button>
           </div>
         </div>

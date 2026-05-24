@@ -148,11 +148,13 @@ function AdminTeachers({state, dispatch}){
             {state.teachers.map(t => (
               <tr key={t.id}>
                 <td>
-                  <div style={{
-                    width:42,height:42,borderRadius:14,
-                    background:`linear-gradient(135deg,${t.avatar},${shade(t.avatar,-25)})`,
-                    display:'grid',placeItems:'center',color:'#fff',fontWeight:700
-                  }}>{(t.name||t.id).slice(0,1)}</div>
+                  <AvatarBubble
+                    photoUrl={t.photoUrl}
+                    color={t.avatar || '#FF6E8A'}
+                    initial={(t.name||t.id).slice(0,1)}
+                    size={42}
+                    radius={14}
+                  />
                 </td>
                 <td><b>{t.id}</b></td>
                 <td>{t.name || '—'}</td>
