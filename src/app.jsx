@@ -127,6 +127,7 @@ function App(){
   const [studentsGrade, setStudentsGrade] = useState('all'); // จำห้องที่กรองไว้ในหน้านักเรียน
   const [bootError, setBootError] = useState('');
   const [profileOpen, setProfileOpen] = useState(false);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const toast = useToast();
   const stateRef = useRef(state);
   stateRef.current = state;
@@ -197,7 +198,7 @@ function App(){
     }});
   }
 
-  const go = (r)=>setRoute(r);
+  const go = (r)=>{ setRoute(r); setMobileNavOpen(false); };
 
   if(!state.user){
     return <LoginScreen onLogin={loginWithSession} bootError={bootError} clearBootError={()=>setBootError('')}/>;
@@ -263,7 +264,8 @@ function App(){
 
   return (
     <div className="app">
-      <aside className="sidebar">
+      {mobileNavOpen && <div className="mobile-nav-backdrop" onClick={()=>setMobileNavOpen(false)}/>}
+      <aside className={'sidebar' + (mobileNavOpen ? ' mobile-open' : '')}>
         <div className="brand">
           <img src="assets/logo-circle.png" alt="CMUDS-ITPC" style={{width:48,height:48,borderRadius:'50%',boxShadow:'var(--shadow-md)',flexShrink:0}}/>
           <div>
@@ -358,7 +360,8 @@ function App(){
 
       <main>
         <div className="topbar">
-          <div>
+          <button className="mobile-nav-toggle" onClick={()=>setMobileNavOpen(true)} aria-label="เปิดเมนู">☰</button>
+          <div style={{flex:1, minWidth:0}}>
             <div className="crumb">Student Report › <b>{crumb}</b></div>
             <div className="page-title">{pageTitle}</div>
           </div>
@@ -565,7 +568,7 @@ function LoginScreen({onLogin, bootError, clearBootError}){
         radial-gradient(900px 400px at 90% 90%, #EDE3FF 0%, transparent 60%),
         #FFF6EF`
     }}>
-      <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:60, maxWidth:1000, alignItems:'center'}}>
+      <div className="login-grid" style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:60, maxWidth:1000, alignItems:'center', width:'100%'}}>
         <div>
           <div className="row" style={{gap:18, marginBottom:18}}>
             <img src="assets/logo-circle.png" alt="CMUDS-ITPC" style={{width:88,height:88,borderRadius:'50%',boxShadow:'0 16px 36px -10px rgba(122,92,255,.45)'}}/>
