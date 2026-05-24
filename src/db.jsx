@@ -17,6 +17,28 @@
   });
 })();
 
+/* === Helper: เรียก Edge Function admin-teachers === */
+async function callAdminFn(action, payload){
+  const sb = window.sb;
+  const { data: sess } = await sb.auth.getSession();
+  if(!sess?.session) throw new Error('ต้อง login ก่อน');
+  const res = await fetch(`${window.SB_URL}/functions/v1/admin-teachers`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${sess.session.access_token}`,
+      'apikey': window.SB_ANON_KEY,
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({ action, ...payload }),
+  });
+  let data = null;
+  try { data = await res.json(); } catch { /* not json */ }
+  if(!res.ok || (data && data.error)){
+    throw new Error((data && data.error) || `HTTP ${res.status}`);
+  }
+  return data || {};
+}
+
 /* === Map DB row ↔ camelCase ที่ pages เดิมใช้ === */
 function studentFromRow(r){
   return {
@@ -177,7 +199,14 @@ async function dbMutate(state, action){
     case 'group-remove': { const { error } = await sb.from('strength_groups').delete().eq('name', action.name); if(error) throw error; return action; }
 
     case 'teacher-add': {
-      throw new Error('ต้องสร้างบัญชีครูจาก Supabase Authentication → Add user → แล้วเพิ่ม profiles row (ดู README)');
+      const { teacher } = await callAdminFn('create', {
+        username: action.username,
+        password: action.password,
+        name: action.name,
+        avatar: action.avatar,
+      });
+      // คืน action ที่มี teacher object พร้อมเข้า reducer
+      return { type:'teacher-add', teacher };
     }
     case 'teacher-update': {
       const t = action.patch || {};
@@ -188,7 +217,18 @@ async function dbMutate(state, action){
       return action;
     }
     case 'teacher-remove': {
-      throw new Error('การลบบัญชีครู ต้องลบจาก Supabase Authentication ก่อน (จะ cascade ลบ profile ให้)');
+      await callAdminFn('delete', { username: action.id });
+      return action;
+    }
+    case 'teacher-set-password': {
+      await callAdminFn('set_password', { username: action.id, password: action.password });
+      return action; // no state change — reducer ไม่ต้องทำอะไร
+    }
+    case 'self-set-password': {
+      // admin/ครูเปลี่ยนรหัสตัวเอง — ไม่ต้องผ่าน edge function
+      const { error } = await sb.auth.updateUser({ password: action.password });
+      if(error) throw error;
+      return action;
     }
 
     case 'set-term': {

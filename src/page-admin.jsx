@@ -106,18 +106,37 @@ function AdminTerm({state, dispatch}){
 
 /* ============ Admin: Teachers ============ */
 function AdminTeachers({state, dispatch}){
-  const [editing, setEditing] = useState(null);
   const colors = ['#FF6E8A','#FF8A5C','#9D7FFF','#5CC9FF','#4FD1AB','#FFC23C','#E66BD6','#7A5CFF'];
+  const [editing, setEditing]   = useState(null); // แก้ชื่อ/สี
+  const [creating, setCreating] = useState(null); // เพิ่มครูใหม่
+  const [pwTarget, setPwTarget] = useState(null); // เปลี่ยนรหัส (ของ user คนอื่น)
+  const [selfPw, setSelfPw]     = useState(null); // เปลี่ยนรหัสตัวเอง
+  const [busy, setBusy] = useState(false);
+
+  const startCreate = ()=> setCreating({ username:'', password:'', name:'', avatar:'#FF6E8A' });
 
   return (
     <div className="stack-lg">
-      <div className="notice">
-        <span className="dot"/>
-        <span>การ <b>เพิ่ม/ลบบัญชีครู</b> และ <b>เปลี่ยนรหัสผ่าน</b> ทำที่ Supabase Dashboard → Authentication → Users (เพื่อความปลอดภัย). หลังเพิ่มแล้วเติมแถวใน <code>profiles</code> ด้วย username + role='teacher'</span>
+      {/* Self password card */}
+      <div className="card">
+        <div className="card-title">
+          <div className="t"><div className="ic" style={{background:'var(--grad-violet)'}}><Icon name="lock" size={16} color="#fff"/></div> รหัสผ่านของคุณ (admin)</div>
+          <button className="btn btn-soft-violet btn-sm" onClick={()=>setSelfPw({ password:'', confirm:'' })}>
+            <Icon name="edit" size={11}/> เปลี่ยนรหัสผ่านของฉัน
+          </button>
+        </div>
+        <div className="muted" style={{fontSize:13}}>
+          เปลี่ยนรหัสของบัญชี admin ที่ล็อกอินอยู่ — ครั้งถัดไปต้องใช้รหัสใหม่ในการ login
+        </div>
       </div>
+
+      {/* Teachers list */}
       <div className="card">
         <div className="card-title">
           <div className="t"><div className="ic" style={{background:'var(--grad-primary)'}}><Icon name="users" size={16} color="#fff"/></div> บัญชีครู</div>
+          <button className="btn btn-primary btn-sm" onClick={startCreate}>
+            <Icon name="plus" size={14}/> เพิ่มครู
+          </button>
         </div>
 
         <table className="tbl">
@@ -137,22 +156,36 @@ function AdminTeachers({state, dispatch}){
                 <td><b>{t.id}</b></td>
                 <td>{t.name || '—'}</td>
                 <td>
-                  <div className="row">
-                    <button className="btn btn-soft btn-sm" onClick={()=>setEditing({...t})}><Icon name="edit" size={11}/> แก้ไขชื่อ/สี</button>
+                  <div className="row" style={{flexWrap:'wrap', gap:6}}>
+                    <button className="btn btn-soft btn-sm" onClick={()=>setEditing({...t})}>
+                      <Icon name="edit" size={11}/> แก้ชื่อ/สี
+                    </button>
+                    <button className="btn btn-soft-violet btn-sm" onClick={()=>setPwTarget({ id:t.id, name:t.name, password:'', confirm:'' })}>
+                      <Icon name="lock" size={11}/> เปลี่ยนรหัส
+                    </button>
+                    <button className="btn btn-soft btn-sm" style={{background:'#FFE0EA', color:'#C24B5C'}} onClick={async ()=>{
+                      if(!confirm(`ลบบัญชี "${t.id}" (${t.name||''}) ถาวร?\nบันทึกพฤติกรรมที่ครูคนนี้สร้างจะยังอยู่`)) return;
+                      try { setBusy(true); await dispatch({type:'teacher-remove', id:t.id}); }
+                      catch(e){ /* toast shown */ }
+                      finally { setBusy(false); }
+                    }}>
+                      <Icon name="trash" size={11}/> ลบ
+                    </button>
                   </div>
                 </td>
               </tr>
             ))}
             {state.teachers.length===0 && (
-              <tr><td colSpan={4}><Empty title="ยังไม่มีบัญชีครู" sub="เพิ่มจาก Supabase Dashboard ก่อน แล้วเติม profiles row" icon="users"/></td></tr>
+              <tr><td colSpan={4}><Empty title="ยังไม่มีบัญชีครู" sub="กดปุ่ม + เพิ่มครู เพื่อสร้างบัญชีแรก" icon="users"/></td></tr>
             )}
           </tbody>
         </table>
       </div>
 
+      {/* === Modal: แก้ชื่อ/สี === */}
       <Modal open={!!editing} onClose={()=>setEditing(null)}
         title="แก้ไขข้อมูลครู"
-        subtitle="แก้ไขชื่อแสดงและสีประจำตัว (Username/Password เปลี่ยนจาก Supabase Dashboard)">
+        subtitle="แก้ไขชื่อแสดงและสีประจำตัว">
         {editing && (
           <div className="stack-lg" style={{marginTop:12}}>
             <div className="field">
@@ -177,16 +210,168 @@ function AdminTeachers({state, dispatch}){
             </div>
             <div className="row" style={{justifyContent:'flex-end',gap:10}}>
               <button className="btn btn-ghost" onClick={()=>setEditing(null)}>ยกเลิก</button>
-              <button className="btn btn-primary" onClick={async ()=>{
+              <button className="btn btn-primary" disabled={busy} onClick={async ()=>{
                 try {
+                  setBusy(true);
                   await dispatch({type:'teacher-update', id:editing.id, patch:{name:editing.name, avatar:editing.avatar}});
                   setEditing(null);
-                } catch(e) { /* toast แสดงแล้ว */ }
+                } catch(e) {} finally { setBusy(false); }
               }}><Icon name="save" size={14}/> บันทึก</button>
             </div>
           </div>
         )}
       </Modal>
+
+      {/* === Modal: เพิ่มครูใหม่ === */}
+      <Modal open={!!creating} onClose={()=>setCreating(null)}
+        title="เพิ่มบัญชีครูใหม่"
+        subtitle="สร้างบัญชีครูสำหรับ login เข้าระบบ — username เป็น a-z, 0-9, _ ความยาว 2-32">
+        {creating && (
+          <div className="stack-lg" style={{marginTop:12}}>
+            <div className="grid" style={{gridTemplateColumns:'1fr 1fr', gap:14}}>
+              <div className="field">
+                <label>Username (สำหรับ login)</label>
+                <input value={creating.username} onChange={e=>setCreating({...creating, username:e.target.value.toLowerCase().replace(/[^a-z0-9_]/g,'')})} placeholder="เช่น t2"/>
+              </div>
+              <PasswordField
+                label="Password (อย่างน้อย 6 ตัวอักษร)"
+                value={creating.password}
+                onChange={(v)=>setCreating({...creating, password:v})}
+              />
+            </div>
+            <div className="field">
+              <label>ชื่อ-นามสกุล</label>
+              <input value={creating.name} onChange={e=>setCreating({...creating, name:e.target.value})} placeholder="เช่น ครูสมศรี ใจดี"/>
+            </div>
+            <div className="field">
+              <label>สีประจำตัว</label>
+              <div className="row" style={{flexWrap:'wrap'}}>
+                {colors.map(c => (
+                  <button key={c} onClick={()=>setCreating({...creating, avatar:c})} style={{
+                    width:32,height:32,borderRadius:'50%',
+                    border: creating.avatar===c?'3px solid var(--ink)':'2px solid #fff',
+                    background:c, cursor:'pointer',boxShadow:'0 2px 6px rgba(0,0,0,.1)'
+                  }}/>
+                ))}
+              </div>
+            </div>
+            <div className="row" style={{justifyContent:'flex-end',gap:10}}>
+              <button className="btn btn-ghost" onClick={()=>setCreating(null)}>ยกเลิก</button>
+              <button className="btn btn-primary" disabled={busy} onClick={async ()=>{
+                if(!creating.username || creating.username.length<2){ alert('กรุณากรอก Username (อย่างน้อย 2 ตัว)'); return; }
+                if(!creating.password || creating.password.length<6){ alert('Password ต้องอย่างน้อย 6 ตัวอักษร'); return; }
+                try {
+                  setBusy(true);
+                  await dispatch({
+                    type:'teacher-add',
+                    username: creating.username,
+                    password: creating.password,
+                    name: creating.name || creating.username,
+                    avatar: creating.avatar,
+                  });
+                  setCreating(null);
+                  alert(`สร้างบัญชี "${creating.username}" เรียบร้อย — login ได้ทันที`);
+                } catch(e) {} finally { setBusy(false); }
+              }}><Icon name="plus" size={14}/> สร้างบัญชี</button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* === Modal: เปลี่ยนรหัสผ่านของครู === */}
+      <Modal open={!!pwTarget} onClose={()=>setPwTarget(null)}
+        title="เปลี่ยนรหัสผ่าน"
+        subtitle={pwTarget ? `บัญชี: ${pwTarget.id}${pwTarget.name?' · '+pwTarget.name:''}` : ''}>
+        {pwTarget && (
+          <div className="stack-lg" style={{marginTop:12}}>
+            <PasswordField
+              label="รหัสผ่านใหม่ (อย่างน้อย 6 ตัวอักษร)"
+              value={pwTarget.password}
+              onChange={(v)=>setPwTarget({...pwTarget, password:v})}
+            />
+            <PasswordField
+              label="ยืนยันรหัสผ่านใหม่"
+              value={pwTarget.confirm}
+              onChange={(v)=>setPwTarget({...pwTarget, confirm:v})}
+            />
+            <div className="row" style={{justifyContent:'flex-end',gap:10}}>
+              <button className="btn btn-ghost" onClick={()=>setPwTarget(null)}>ยกเลิก</button>
+              <button className="btn btn-violet" disabled={busy} onClick={async ()=>{
+                if(!pwTarget.password || pwTarget.password.length<6){ alert('รหัสผ่านต้องอย่างน้อย 6 ตัวอักษร'); return; }
+                if(pwTarget.password !== pwTarget.confirm){ alert('รหัสผ่านยืนยันไม่ตรงกัน'); return; }
+                try {
+                  setBusy(true);
+                  await dispatch({type:'teacher-set-password', id:pwTarget.id, password:pwTarget.password});
+                  setPwTarget(null);
+                  alert(`เปลี่ยนรหัสผ่านของ "${pwTarget.id}" เรียบร้อย`);
+                } catch(e) {} finally { setBusy(false); }
+              }}><Icon name="save" size={14}/> บันทึกรหัสใหม่</button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* === Modal: เปลี่ยนรหัสผ่านของตัวเอง === */}
+      <Modal open={!!selfPw} onClose={()=>setSelfPw(null)}
+        title="เปลี่ยนรหัสผ่านของฉัน"
+        subtitle="หลังเปลี่ยนแล้ว ครั้งถัดไปต้อง login ด้วยรหัสใหม่">
+        {selfPw && (
+          <div className="stack-lg" style={{marginTop:12}}>
+            <PasswordField
+              label="รหัสผ่านใหม่ (อย่างน้อย 6 ตัวอักษร)"
+              value={selfPw.password}
+              onChange={(v)=>setSelfPw({...selfPw, password:v})}
+            />
+            <PasswordField
+              label="ยืนยันรหัสผ่านใหม่"
+              value={selfPw.confirm}
+              onChange={(v)=>setSelfPw({...selfPw, confirm:v})}
+            />
+            <div className="row" style={{justifyContent:'flex-end',gap:10}}>
+              <button className="btn btn-ghost" onClick={()=>setSelfPw(null)}>ยกเลิก</button>
+              <button className="btn btn-violet" disabled={busy} onClick={async ()=>{
+                if(!selfPw.password || selfPw.password.length<6){ alert('รหัสผ่านต้องอย่างน้อย 6 ตัวอักษร'); return; }
+                if(selfPw.password !== selfPw.confirm){ alert('รหัสผ่านยืนยันไม่ตรงกัน'); return; }
+                try {
+                  setBusy(true);
+                  await dispatch({type:'self-set-password', password:selfPw.password});
+                  setSelfPw(null);
+                  alert('เปลี่ยนรหัสผ่านของคุณเรียบร้อย');
+                } catch(e) {} finally { setBusy(false); }
+              }}><Icon name="save" size={14}/> บันทึกรหัสใหม่</button>
+            </div>
+          </div>
+        )}
+      </Modal>
+    </div>
+  );
+}
+
+/* Password input with eye toggle */
+function PasswordField({label, value, onChange}){
+  const [show, setShow] = useState(false);
+  return (
+    <div className="field">
+      <label>{label}</label>
+      <div style={{position:'relative'}}>
+        <input
+          type={show?'text':'password'}
+          value={value || ''}
+          onChange={e=>onChange(e.target.value)}
+          placeholder="••••••••"
+          style={{width:'100%', paddingRight:42}}
+        />
+        <button
+          type="button"
+          onClick={()=>setShow(v=>!v)}
+          aria-label={show?'ซ่อนรหัส':'แสดงรหัส'}
+          style={{
+            position:'absolute', top:'50%', right:6, transform:'translateY(-50%)',
+            width:30, height:30, borderRadius:8, border:0, cursor:'pointer',
+            background:'transparent', fontSize:16, display:'grid', placeItems:'center',
+          }}
+        >{show ? '🙈' : '👁️'}</button>
+      </div>
     </div>
   );
 }

@@ -53,6 +53,9 @@ function reducer(state, action){
       return {...state, teachers: state.teachers.map(t=>t.id===action.id?{...t, ...action.patch}:t)};
     case 'teacher-remove':
       return {...state, teachers: state.teachers.filter(t=>t.id!==action.id)};
+    case 'teacher-set-password':
+    case 'self-set-password':
+      return state; // ไม่มี state ต้องเปลี่ยน — password ไม่เก็บใน client
 
     case 'set-term':
       return {...state, currentTerm: action.term, currentYear: action.year};

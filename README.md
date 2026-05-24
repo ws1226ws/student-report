@@ -101,23 +101,33 @@ vercel --prod
 
 ---
 
-## วิธีเพิ่มครูใหม่ (หลังจาก deploy)
+## Edge Function — จัดการบัญชีครูจากในแอป
 
-จากเหตุผลความปลอดภัย — anon key ไม่มีสิทธิ์สร้าง user — ต้องทำ 2 ขั้นตอน:
+แอปเรียก Supabase Edge Function ชื่อ `admin-teachers` เพื่อ:
+- เพิ่มบัญชีครูใหม่
+- ลบบัญชีครู
+- เปลี่ยนรหัสผ่านของครู
 
-1. Supabase Dashboard → **Authentication → Users → Add user**
-   - Email: `<username>@studentreport.local` (เช่น `t2@studentreport.local`)
-   - Password: ตามต้องการ
-   - เปิด **Auto Confirm**
-2. SQL Editor:
-   ```sql
-   insert into public.profiles (user_id, username, full_name, role, avatar)
-   select id, 't2', 'ครู XX', 'teacher', '#4FD1AB'
-   from auth.users where email='t2@studentreport.local';
-   ```
-3. ครูใหม่ login ด้วย username `t2` ได้ทันที
+Function จะตรวจสอบ JWT ของ caller ว่าเป็น `role='admin'` ก่อนเสมอ
+แล้วจึงใช้ `service_role` key (ที่อยู่ฝั่งเซิร์ฟเวอร์เท่านั้น) เรียก Supabase Auth Admin API
 
-> ในแอป (Admin → บัญชีครู) แก้ได้แค่ชื่อแสดงและสีประจำตัว — Username/Password เปลี่ยนที่ Supabase Dashboard
+### Deploy function (ครั้งเดียว — ผ่าน Dashboard)
+
+1. Supabase Dashboard → **Edge Functions** (Sidebar) → **Deploy a new function**
+2. ตั้งชื่อ: **`admin-teachers`** (ต้องสะกดตรงนี้)
+3. คัดลอกเนื้อหาทั้งหมดจาก [`supabase/functions/admin-teachers/index.ts`](supabase/functions/admin-teachers/index.ts) → วางในตัว editor
+4. กด **Deploy function**
+5. รอจนสถานะเป็น **Active** (สีเขียว) — เสร็จ
+
+> Env vars (`SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`) Supabase inject ให้อัตโนมัติ — ไม่ต้องตั้งเอง
+
+### ใช้งานในแอป
+
+หลัง deploy แล้ว ในเมนู **Admin → 🍎 บัญชีครู** จะทำได้:
+- ปุ่ม **+ เพิ่มครู** → กรอก username + password + ชื่อ + สี
+- ปุ่ม **เปลี่ยนรหัส** ต่อแถว → ใส่รหัสใหม่ + ยืนยัน
+- ปุ่ม **ลบ** ต่อแถว
+- การ์ดด้านบน **เปลี่ยนรหัสผ่านของฉัน** สำหรับ admin เปลี่ยนรหัสตัวเอง
 
 ---
 
@@ -134,7 +144,7 @@ vercel --prod
 
 | บริการ | สิ่งที่ได้ฟรี | พอสำหรับเคสนี้? |
 |---|---|---|
-| Supabase Free | 500MB DB · 50K MAU · 1GB Storage | ✅ พอเหลือเฟือ (24 นักเรียน · log < 10K rows/ปี) |
+| Supabase Free | 500MB DB · 50K MAU · 1GB Storage · 500K Edge Function invocations/เดือน | ✅ พอเหลือเฟือ (24 นักเรียน · log < 10K rows/ปี · admin-teachers invocations < 100/เดือน) |
 | Vercel Hobby  | 100GB bandwidth · unlimited deploys | ✅ พอสบาย |
 
 หมายเหตุ: Supabase free จะ **pause project** ถ้าไม่ใช้ 7 วันติด — แค่กดปุ่ม resume ใน dashboard ก็กลับมาทำงาน
@@ -149,3 +159,5 @@ vercel --prod
 | Login ได้แต่ "ยังไม่มี profile" | ลืมรัน insert profiles | กลับไปขั้นตอน 3 |
 | โหลดข้อมูลไม่ขึ้น (RLS error) | ลืมรัน schema.sql ทั้งไฟล์ | รันใหม่ทั้งไฟล์ |
 | Console: "SB_URL ยังเป็น placeholder" | ยังไม่แก้ config.js | ขั้นตอน 4 |
+| เพิ่ม/ลบครูแล้วขึ้น "Failed to fetch" / 404 | ยังไม่ deploy edge function | ดูหัวข้อ "Edge Function" ด้านบน |
+| เพิ่มครู → "เฉพาะ admin เท่านั้น" | profile ของคุณยังเป็น `teacher` | SQL Editor: `update public.profiles set role='admin' where username='admin';` |
