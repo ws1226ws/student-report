@@ -122,11 +122,12 @@ create trigger students_touch before update on public.students
   for each row execute function public.touch_updated_at();
 
 -- =============================================================
--- Helper: is_admin(uid)
+-- Helper: is_admin(check_uid)
+-- ใช้ $1 แทนชื่อพารามิเตอร์เพื่อเลี่ยงปัญหา name resolution ของ Postgres
 -- =============================================================
-create or replace function public.is_admin(uid uuid) returns boolean
+create or replace function public.is_admin(check_uid uuid) returns boolean
   language sql stable as $$
-    select exists (select 1 from public.profiles p where p.user_id = uid and p.role = 'admin');
+    select exists (select 1 from public.profiles p where p.user_id = $1 and p.role = 'admin');
   $$;
 
 -- =============================================================
