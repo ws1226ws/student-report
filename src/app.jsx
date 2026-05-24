@@ -391,13 +391,20 @@ function SelfProfileModal({open, onClose, user, dispatch}){
     try {
       setBusy(true);
       await dispatch({type:'self-update-photo', blob});
-    } catch(e){} finally { setBusy(false); }
+      // success — บอกผู้ใช้แบบชัดๆ
+      alert('อัปโหลดรูปโปรไฟล์เรียบร้อย');
+    } catch(e){
+      // dispatcher แสดง toast แล้ว แต่ alert ด้วยเพื่อให้เห็นชัด
+      alert('อัปโหลดรูปไม่สำเร็จ\n\n' + (e?.message || e) + '\n\nดูรายละเอียดเพิ่มเติมที่ DevTools → Console');
+    } finally { setBusy(false); }
   };
   const removePhoto = async ()=>{
     try {
       setBusy(true);
       await dispatch({type:'self-remove-photo'});
-    } catch(e){} finally { setBusy(false); }
+    } catch(e){
+      alert('ลบรูปไม่สำเร็จ: ' + (e?.message || e));
+    } finally { setBusy(false); }
   };
 
   const savePassword = async ()=>{

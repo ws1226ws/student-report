@@ -46,12 +46,11 @@ function PageStudentDetail({state, dispatch, go, studentId}){
           <button className="btn btn-ghost btn-sm" onClick={()=>go('students')} style={{position:'absolute',top:18,left:18}}>
             <Icon name="chevron_l" size={12}/> กลับ
           </button>
-          <div style={{position:'absolute',top:18,right:18,display:'flex',gap:8}}>
+          <div style={{position:'absolute',top:18,right:18,display:'flex',gap:8,zIndex:2}}>
             <button className="btn btn-ghost btn-sm" onClick={()=>go('behaviors:new:'+stu.id)}>
               <Icon name="plus" size={12}/> บันทึกพฤติกรรม
             </button>
           </div>
-          <div style={{position:'absolute',right:30,top:30,fontSize:130,opacity:.08,lineHeight:1}}>{stu.gender==='ชาย'?'👦':'👧'}</div>
         </div>
 
         <div style={{padding:'0 28px 24px', position:'relative'}}>

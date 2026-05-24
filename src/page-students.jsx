@@ -268,7 +268,7 @@ function StudentForm({initial, onSave, onCancel, onDelete}){
 
           <div className="field"><label>เพศ</label>
             <div className="seg" style={{width:'100%'}}>
-              {['หญิง','ชาย','อื่นๆ'].map(g => (
+              {['หญิง','ชาย'].map(g => (
                 <button key={g} className={f.gender===g?'on':''} onClick={()=>set('gender',g)} style={{flex:1}}>{g}</button>
               ))}
             </div>
