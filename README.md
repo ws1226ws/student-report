@@ -161,3 +161,4 @@ Function จะตรวจสอบ JWT ของ caller ว่าเป็น 
 | Console: "SB_URL ยังเป็น placeholder" | ยังไม่แก้ config.js | ขั้นตอน 4 |
 | เพิ่ม/ลบครูแล้วขึ้น "Failed to fetch" / 404 | ยังไม่ deploy edge function | ดูหัวข้อ "Edge Function" ด้านบน |
 | เพิ่มครู → "เฉพาะ admin เท่านั้น" | profile ของคุณยังเป็น `teacher` | SQL Editor: `update public.profiles set role='admin' where username='admin';` |
+| โปรไฟล์ของฉัน → บันทึกแล้วขึ้น "function update_my_profile does not exist" | ยังไม่ได้รัน SQL function ตัวใหม่ | SQL Editor → คัดลอกบล็อก `create or replace function public.update_my_profile...` จาก [supabase/schema.sql](supabase/schema.sql) → Run |

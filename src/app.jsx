@@ -58,6 +58,15 @@ function reducer(state, action){
       return state; // ไม่มี state ต้องเปลี่ยน — password ไม่เก็บใน client
     case 'teacher-set-username':
       return {...state, teachers: state.teachers.map(t => t.id===action.id ? {...t, id:action.newId} : t)};
+    case 'self-update-profile': {
+      const name   = action.name   ?? state.user.name;
+      const avatar = action.avatar ?? state.user.avatar;
+      return {
+        ...state,
+        user:     {...state.user, name, avatar},
+        teachers: state.teachers.map(t => t.id===state.user.id ? {...t, name, avatar} : t),
+      };
+    }
 
     case 'set-term':
       return {...state, currentTerm: action.term, currentYear: action.year};
@@ -101,6 +110,7 @@ function App(){
   const [state, dispatch] = useReducer(reducer, undefined, initialState);
   const [route, setRoute] = useState('dashboard');
   const [bootError, setBootError] = useState('');
+  const [profileOpen, setProfileOpen] = useState(false);
   const toast = useToast();
   const stateRef = useRef(state);
   stateRef.current = state;
@@ -281,14 +291,20 @@ function App(){
                 </div>
               </div>
             </div>
-            <button className="icon-btn" style={{width:32,height:32,fontSize:14}} onClick={async ()=>{
-              if(confirm('ออกจากระบบ?')){
-                await window.sb.auth.signOut();
-                dispatch({type:'logout'});
-              }
-            }} title="ออกจากระบบ">
-              <Icon name="lock" size={14}/>
-            </button>
+            <div className="row" style={{gap:6}}>
+              <button className="icon-btn" style={{width:32,height:32,fontSize:14}}
+                onClick={()=>setProfileOpen(true)} title="โปรไฟล์ของฉัน">
+                <Icon name="user" size={14}/>
+              </button>
+              <button className="icon-btn" style={{width:32,height:32,fontSize:14}} onClick={async ()=>{
+                if(confirm('ออกจากระบบ?')){
+                  await window.sb.auth.signOut();
+                  dispatch({type:'logout'});
+                }
+              }} title="ออกจากระบบ">
+                <Icon name="lock" size={14}/>
+              </button>
+            </div>
           </div>
 
           {state.user.role==='admin' && (
@@ -320,8 +336,117 @@ function App(){
         <div className="main">{page}</div>
       </main>
 
+      <SelfProfileModal open={profileOpen} onClose={()=>setProfileOpen(false)} user={state.user} dispatch={dispatch}/>
+
       {toast.node}
     </div>
+  );
+}
+
+/* === Self Profile Modal: เปลี่ยนชื่อ/สี/รหัสผ่านของตัวเอง === */
+function SelfProfileModal({open, onClose, user, dispatch}){
+  const colors = ['#FF6E8A','#FF8A5C','#9D7FFF','#5CC9FF','#4FD1AB','#FFC23C','#E66BD6','#7A5CFF'];
+  const [name, setName]     = useState(user?.name || '');
+  const [avatar, setAvatar] = useState(user?.avatar || '#FF6E8A');
+  const [pwd, setPwd]       = useState('');
+  const [pwd2, setPwd2]     = useState('');
+  const [busy, setBusy]     = useState(false);
+
+  useEffect(()=>{
+    if(open && user){
+      setName(user.name || '');
+      setAvatar(user.avatar || '#FF6E8A');
+      setPwd(''); setPwd2('');
+    }
+  }, [open, user]);
+
+  if(!user) return null;
+  const isAdmin = user.role === 'admin';
+
+  const saveProfile = async ()=>{
+    if(!name.trim()){ alert('กรุณากรอกชื่อแสดง'); return; }
+    try {
+      setBusy(true);
+      await dispatch({type:'self-update-profile', name:name.trim(), avatar});
+      alert('บันทึกโปรไฟล์เรียบร้อย');
+    } catch(e){} finally { setBusy(false); }
+  };
+
+  const savePassword = async ()=>{
+    if(!pwd || pwd.length<6){ alert('รหัสผ่านต้องอย่างน้อย 6 ตัวอักษร'); return; }
+    if(pwd !== pwd2){ alert('รหัสผ่านยืนยันไม่ตรงกัน'); return; }
+    try {
+      setBusy(true);
+      await dispatch({type:'self-set-password', password:pwd});
+      setPwd(''); setPwd2('');
+      alert('เปลี่ยนรหัสผ่านเรียบร้อย — ครั้งถัดไปต้องใช้รหัสใหม่');
+    } catch(e){} finally { setBusy(false); }
+  };
+
+  return (
+    <Modal open={open} onClose={onClose} title="โปรไฟล์ของฉัน" subtitle={`${user.id} · ${isAdmin?'ผู้ดูแลระบบ (admin)':'ครู'}`}>
+      <div className="stack-lg" style={{marginTop:12}}>
+        {/* Avatar preview */}
+        <div className="row" style={{gap:14}}>
+          <div style={{
+            width:64,height:64,borderRadius:20,
+            background:`linear-gradient(135deg,${avatar},${shade(avatar,-25)})`,
+            display:'grid',placeItems:'center',color:'#fff',fontWeight:700,fontSize:28,
+            boxShadow:'0 10px 24px -10px rgba(80,40,80,.25)',
+          }}>{isAdmin?'👑':'🍎'}</div>
+          <div className="muted" style={{fontSize:13, lineHeight:1.5}}>
+            ชื่อและสีนี้จะแสดงในระบบ — ตัวคุณเองและคนอื่นที่เห็นบันทึกของคุณจะเห็นข้อมูลนี้
+          </div>
+        </div>
+
+        {/* Name + avatar */}
+        <div className="card" style={{padding:18, boxShadow:'none', background:'#FFF7EF'}}>
+          <div className="field">
+            <label>ชื่อแสดง</label>
+            <input value={name} onChange={e=>setName(e.target.value)} placeholder="เช่น ครูสมศรี ใจดี"/>
+          </div>
+          <div className="field" style={{marginTop:14}}>
+            <label>สีประจำตัว</label>
+            <div className="row" style={{flexWrap:'wrap'}}>
+              {colors.map(c => (
+                <button key={c} onClick={()=>setAvatar(c)} style={{
+                  width:34,height:34,borderRadius:'50%',
+                  border: avatar===c?'3px solid var(--ink)':'2px solid #fff',
+                  background:c, cursor:'pointer',boxShadow:'0 2px 6px rgba(0,0,0,.1)'
+                }}/>
+              ))}
+            </div>
+          </div>
+          <div className="row" style={{justifyContent:'flex-end',marginTop:14}}>
+            <button className="btn btn-primary" disabled={busy} onClick={saveProfile}>
+              <Icon name="save" size={14}/> บันทึกโปรไฟล์
+            </button>
+          </div>
+        </div>
+
+        {/* Password */}
+        <div className="card" style={{padding:18, boxShadow:'none', background:'#EDE3FF'}}>
+          <div className="row" style={{gap:10, marginBottom:12}}>
+            <div style={{width:32,height:32,borderRadius:10,background:'var(--grad-violet)',display:'grid',placeItems:'center',color:'#fff'}}>
+              <Icon name="lock" size={14}/>
+            </div>
+            <div style={{fontWeight:600}}>เปลี่ยนรหัสผ่าน</div>
+          </div>
+          <PasswordField label="รหัสผ่านใหม่ (อย่างน้อย 6 ตัวอักษร)" value={pwd}  onChange={setPwd}/>
+          <div style={{height:12}}/>
+          <PasswordField label="ยืนยันรหัสผ่านใหม่" value={pwd2} onChange={setPwd2}/>
+          <div className="row" style={{justifyContent:'flex-end',marginTop:14}}>
+            <button className="btn btn-violet" disabled={busy} onClick={savePassword}>
+              <Icon name="save" size={14}/> เปลี่ยนรหัสผ่าน
+            </button>
+          </div>
+        </div>
+
+        <div className="row" style={{justifyContent:'flex-end'}}>
+          <button className="btn btn-ghost" onClick={onClose}>ปิด</button>
+        </div>
+      </div>
+    </Modal>
   );
 }
 

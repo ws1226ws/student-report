@@ -131,6 +131,29 @@ create or replace function public.is_admin(check_uid uuid) returns boolean
   $$;
 
 -- =============================================================
+-- Helper: update_my_profile(p_name, p_avatar)
+-- ให้ user ที่ login แล้ว update ชื่อ + สี ของตัวเองได้ (ไม่ผ่าน RLS update)
+-- ป้องกัน role escalation: function นี้แตะแค่ full_name + avatar เท่านั้น
+-- =============================================================
+create or replace function public.update_my_profile(p_name text, p_avatar text)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if auth.uid() is null then
+    raise exception 'ต้อง login ก่อน';
+  end if;
+  update public.profiles
+    set full_name = coalesce(nullif(trim(p_name), ''), full_name),
+        avatar    = coalesce(nullif(trim(p_avatar), ''), avatar)
+    where user_id = auth.uid();
+end;
+$$;
+grant execute on function public.update_my_profile(text, text) to authenticated;
+
+-- =============================================================
 -- RLS
 -- ครู: อ่านได้ทุก table หลัก, เขียน behavior_logs ได้, แก้ไข students ได้
 -- admin: ทำได้ทุกอย่าง รวมถึง config tables (strengths/groups/categories/settings/profiles)

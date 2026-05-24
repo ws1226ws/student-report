@@ -234,6 +234,15 @@ async function dbMutate(state, action){
       if(error) throw error;
       return action;
     }
+    case 'self-update-profile': {
+      // เปลี่ยนชื่อ + สี ของตัวเอง ผ่าน SECURITY DEFINER function (กัน role escalation)
+      const { error } = await sb.rpc('update_my_profile', {
+        p_name:   action.name   ?? null,
+        p_avatar: action.avatar ?? null,
+      });
+      if(error) throw error;
+      return action;
+    }
 
     case 'set-term': {
       const { error } = await sb.from('app_settings').update({ current_term: action.term, current_year: action.year, updated_at: new Date().toISOString() }).eq('id', 1);

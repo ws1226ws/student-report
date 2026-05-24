@@ -386,34 +386,7 @@ function AdminTeachers({state, dispatch}){
   );
 }
 
-/* Password input with eye toggle */
-function PasswordField({label, value, onChange}){
-  const [show, setShow] = useState(false);
-  return (
-    <div className="field">
-      <label>{label}</label>
-      <div style={{position:'relative'}}>
-        <input
-          type={show?'text':'password'}
-          value={value || ''}
-          onChange={e=>onChange(e.target.value)}
-          placeholder="••••••••"
-          style={{width:'100%', paddingRight:42}}
-        />
-        <button
-          type="button"
-          onClick={()=>setShow(v=>!v)}
-          aria-label={show?'ซ่อนรหัส':'แสดงรหัส'}
-          style={{
-            position:'absolute', top:'50%', right:6, transform:'translateY(-50%)',
-            width:30, height:30, borderRadius:8, border:0, cursor:'pointer',
-            background:'transparent', fontSize:16, display:'grid', placeItems:'center',
-          }}
-        >{show ? '🙈' : '👁️'}</button>
-      </div>
-    </div>
-  );
-}
+/* PasswordField moved to ui.jsx — used here as global */
 
 /* ============ Admin: Behavior Categories ============ */
 function AdminCategories({state, dispatch}){
