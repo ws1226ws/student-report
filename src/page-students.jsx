@@ -208,7 +208,7 @@ function StudentForm({initial, onSave, onCancel, onDelete}){
     weight:'', height:'', age:8,
     conditions:'', specialNeeds:'',
     parents:[{label:'แม่',phone:''},{label:'พ่อ',phone:''}],
-    photoData:'',
+    photoUrl:'',
     avatarColor:'#FF6E8A',
   };
   const [f, setF] = useState(initial || empty);
@@ -237,7 +237,7 @@ function StudentForm({initial, onSave, onCancel, onDelete}){
     <div>
       <div style={{display:'grid',gridTemplateColumns:'160px 1fr',gap:24,marginTop:12}}>
         <div style={{display:'flex',flexDirection:'column',gap:14,alignItems:'center'}}>
-          <PhotoSlot value={f.photoData} onChange={(v)=>set('photoData', v)} size={140}/>
+          <PhotoSlot value={f.photoUrl} onChange={(v)=>set('photoUrl', v)} size={140}/>
           <div style={{display:'flex',flexWrap:'wrap',gap:6,justifyContent:'center',maxWidth:160}}>
             {colors.map(c => (
               <button key={c} onClick={()=>set('avatarColor', c)} style={{

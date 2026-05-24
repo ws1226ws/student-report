@@ -249,17 +249,29 @@ async function dbMutate(state, action){
       const uid = sess?.session?.user?.id;
       if(!uid) throw new Error('ต้อง login ก่อน');
       const path = `${uid}/avatar.jpg`;
+      console.info('[avatar] uploading to', path, 'size', action.blob.size);
       const { error: upErr } = await sb.storage.from('avatars').upload(path, action.blob, {
         contentType: 'image/jpeg',
         upsert: true,
         cacheControl: '3600',
       });
-      if(upErr) throw new Error('อัปโหลดรูปไม่สำเร็จ: ' + upErr.message);
+      if(upErr){
+        console.error('[avatar] upload error', upErr);
+        throw new Error('อัปโหลดรูปไม่สำเร็จ: ' + (upErr.message || JSON.stringify(upErr)));
+      }
       const { data: pub } = sb.storage.from('avatars').getPublicUrl(path);
-      // เติม ?v=<timestamp> เพื่อบังคับให้ browser refresh cache หลังเปลี่ยนรูป
       const url = pub.publicUrl + '?v=' + Date.now();
+      console.info('[avatar] public URL', url);
+      // verify accessibility (helpful when bucket policies are missing)
+      try {
+        const r = await fetch(url, { method:'HEAD', cache:'no-store' });
+        if(!r.ok) console.warn('[avatar] HEAD check failed', r.status, url);
+      } catch(e){ console.warn('[avatar] HEAD check threw', e); }
       const { error: rpcErr } = await sb.rpc('update_my_photo', { p_photo_url: url });
-      if(rpcErr) throw rpcErr;
+      if(rpcErr){
+        console.error('[avatar] rpc update_my_photo error', rpcErr);
+        throw rpcErr;
+      }
       return { type:'self-update-photo', photoUrl: url };
     }
     case 'self-remove-photo': {

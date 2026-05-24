@@ -48,9 +48,11 @@ function Icon({name, size=18, color='currentColor', stroke=2}){
   return <svg viewBox="0 0 24 24" style={s}>{paths[name] || null}</svg>;
 }
 
-/* ---------- Avatar ---------- */
+/* ---------- Avatar (student) ---------- */
 function Avatar({student, size=44}){
   const initials = (student.nickname || student.firstName || '?').slice(0,1);
+  const [err, setErr] = useState(false);
+  const photo = !err && (student.photoUrl || student.photoData); // photoData kept for back-compat
   return (
     <div className="avatar"
       style={{
@@ -58,8 +60,8 @@ function Avatar({student, size=44}){
         background:`linear-gradient(135deg, ${student.avatarColor}, ${shade(student.avatarColor, -20)})`,
         fontSize: size*0.42,
       }}>
-      {student.photoData
-        ? <img src={student.photoData} alt={student.nickname}/>
+      {photo
+        ? <img src={photo} alt={student.nickname} onError={()=>setErr(true)}/>
         : initials}
     </div>
   );
@@ -161,32 +163,80 @@ function Sparkle({style}){
   return <span style={{...style,display:'inline-block'}}>✨</span>;
 }
 
-/* ---------- Photo upload placeholder ---------- */
+/* ---------- Photo upload placeholder (resizes to ~512px JPEG base64) ---------- */
 function PhotoSlot({value, onChange, size=120, label='อัปโหลดรูปโปรไฟล์'}){
   const ref = useRef();
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState(false);
   const pick = ()=>ref.current && ref.current.click();
-  const onFile = (e)=>{
+  const onFile = async (e)=>{
     const f = e.target.files[0];
+    e.target.value = '';
     if(!f) return;
-    const r = new FileReader();
-    r.onload = ()=>onChange(r.result);
-    r.readAsDataURL(f);
+    if(!/^image\//.test(f.type)){ alert('กรุณาเลือกไฟล์รูปภาพ'); return; }
+    if(f.size > 8*1024*1024){ alert('ไฟล์ใหญ่เกิน 8MB'); return; }
+    try {
+      setBusy(true);
+      const dataUrl = await resizeImageToDataUrl(f, 512, 0.85);
+      onChange(dataUrl);
+      setErr(false);
+    } catch(ex){
+      console.error('image resize failed', ex);
+      alert('โหลดรูปไม่สำเร็จ: ' + (ex.message || ex));
+    } finally { setBusy(false); }
   };
+  const showImg = value && !err;
   return (
     <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:8}}>
       <div onClick={pick} style={{
         width:size,height:size,borderRadius:size*0.3,
-        background: value ? '' :
+        background: showImg ? '#fff' :
           'repeating-linear-gradient(45deg, #FFE3D6, #FFE3D6 8px, #FFD8C6 8px, #FFD8C6 16px)',
         display:'grid',placeItems:'center',color:'#C24B5C',cursor:'pointer',
         boxShadow:'0 8px 18px -8px rgba(255,110,138,.4)',overflow:'hidden',
       }}>
-        {value ? <img src={value} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/> : <Icon name="image" size={28}/>}
+        {showImg
+          ? <img src={value} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}} onError={()=>setErr(true)}/>
+          : <Icon name="image" size={28}/>}
       </div>
-      <button className="btn btn-soft btn-sm" onClick={pick}><Icon name="image" size={14}/> {label}</button>
+      <div className="row" style={{gap:6}}>
+        <button className="btn btn-soft btn-sm" onClick={pick} disabled={busy}>
+          <Icon name="image" size={14}/> {busy ? 'กำลังโหลด…' : label}
+        </button>
+        {value && (
+          <button className="btn btn-soft btn-sm" style={{background:'#FFE0EA',color:'#C24B5C'}} onClick={()=>onChange('')}>
+            <Icon name="trash" size={11}/>
+          </button>
+        )}
+      </div>
       <input type="file" ref={ref} accept="image/*" style={{display:'none'}} onChange={onFile}/>
     </div>
   );
+}
+
+/* Resize image File → square-fit JPEG data URL, capped at maxSide px */
+function resizeImageToDataUrl(file, maxSide=512, quality=0.85){
+  return new Promise((resolve, reject)=>{
+    const reader = new FileReader();
+    reader.onerror = ()=>reject(new Error('อ่านไฟล์ไม่สำเร็จ'));
+    reader.onload = ()=>{
+      const img = new Image();
+      img.onerror = ()=>reject(new Error('รูปเปิดไม่ได้'));
+      img.onload = ()=>{
+        const ratio = Math.min(1, maxSide / Math.max(img.naturalWidth, img.naturalHeight));
+        const w = Math.round(img.naturalWidth * ratio);
+        const h = Math.round(img.naturalHeight * ratio);
+        const cv = document.createElement('canvas');
+        cv.width = w; cv.height = h;
+        const ctx = cv.getContext('2d');
+        ctx.fillStyle = '#fff'; ctx.fillRect(0,0,w,h);
+        ctx.drawImage(img, 0, 0, w, h);
+        resolve(cv.toDataURL('image/jpeg', quality));
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
 }
 
 /* ---------- Empty State ---------- */
@@ -260,17 +310,30 @@ function PasswordField({label, value, onChange, placeholder='••••••�
    ถ้ามี photoUrl → แสดงรูป (cover); ถ้าไม่มี → gradient จาก color + initial
 */
 function AvatarBubble({photoUrl, color='#FF6E8A', initial='', size=44, radius='50%'}){
-  const style = {
+  const [err, setErr] = useState(false);
+  // reset error state when photoUrl changes (e.g. after re-upload)
+  useEffect(()=>{ setErr(false); }, [photoUrl]);
+  const baseStyle = {
     width:size, height:size, borderRadius:radius,
     display:'grid', placeItems:'center',
     color:'#fff', fontWeight:700, fontSize:Math.round(size*0.42),
     overflow:'hidden', flexShrink:0,
     boxShadow:'0 4px 10px -4px rgba(0,0,0,.15)',
   };
-  if(photoUrl){
-    return <div style={style}><img src={photoUrl} alt="" style={{width:'100%',height:'100%',objectFit:'cover',display:'block'}} onError={(e)=>{e.target.style.display='none';}}/></div>;
+  const showImg = photoUrl && !err;
+  if(showImg){
+    return (
+      <div style={baseStyle}>
+        <img
+          src={photoUrl}
+          alt=""
+          style={{width:'100%',height:'100%',objectFit:'cover',display:'block'}}
+          onError={()=>{ console.warn('AvatarBubble: image failed', photoUrl); setErr(true); }}
+        />
+      </div>
+    );
   }
-  return <div style={{...style, background:`linear-gradient(135deg,${color},${shade(color,-25)})`}}>{initial}</div>;
+  return <div style={{...baseStyle, background:`linear-gradient(135deg,${color},${shade(color,-25)})`}}>{initial}</div>;
 }
 
 /* ---------- AvatarEditor: เลือกไฟล์ → drag/zoom → crop เป็น JPEG blob ----------
